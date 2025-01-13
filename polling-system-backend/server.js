@@ -8,7 +8,16 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors({ origin: "http://localhost:3000" })); // Allow front-end origin
+app.use(cors({
+    origin: [
+        "http://localhost:3000",          // React app
+        "http://localhost:8081",         // Expo local host
+        "http://192.168.0.230:8081",     // Example IP of your local network
+        "http://192.168.0.230",          // General IP for Expo
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"], // Allowed HTTP methods
+    credentials: true                     // Allow cookies if needed
+}));
 app.use(express.json()); // Parse JSON request bodies
 
 // Logging middleware
@@ -24,7 +33,8 @@ app.use((req, res, next) => {
 app.use("/api", router);
 app.use('/admin', adminRouter);
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+// Start the server
+app.listen(PORT, "0.0.0.0", () => { // Bind to all network interfaces
+    console.log(`Server is running on http://0.0.0.0:${PORT}`);
+    console.log(`Accessible on your network at http://192.168.0.230:${PORT}`); // Replace with your actual local IP
 });
-
