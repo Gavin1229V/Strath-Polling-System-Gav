@@ -1,47 +1,44 @@
 import { StyleSheet } from "react-native";
 
-export default StyleSheet.create({
+const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 20,
         backgroundColor: "#f5f5f5",
     },
     header: {
         fontSize: 24,
         fontWeight: "bold",
         textAlign: "center",
-        marginBottom: 20,
-    },
-    pollSection: {
-        marginBottom: 20,
-        backgroundColor: "#ffffff",
-        padding: 15,
-        borderRadius: 8,
-        shadowColor: "#000",
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        marginVertical: 20,
     },
     subHeader: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: "bold",
-        marginBottom: 10,
+        marginVertical: 10,
+    },
+    pollSection: {
+        padding: 20,
     },
     input: {
         borderWidth: 1,
         borderColor: "#ccc",
-        borderRadius: 8,
         padding: 10,
-        marginBottom: 10,
+        marginVertical: 5,
+        borderRadius: 5,
     },
     pollCard: {
-        marginBottom: 15,
-        padding: 10,
-        backgroundColor: "#f9f9f9",
-        borderRadius: 8,
+        backgroundColor: "#fff",
+        padding: 20,
+        marginVertical: 10,
+        borderRadius: 5,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 3,
     },
     pollQuestion: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: "bold",
         marginBottom: 10,
     },
@@ -49,15 +46,13 @@ export default StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 5,
+        paddingVertical: 5,
     },
     status: {
         textAlign: "center",
-        fontSize: 16,
-        color: "#28a745",
-        marginTop: 10,
-    },
-    chart: {
+        color: "red",
         marginVertical: 10,
     },
 });
+
+export default styles;
