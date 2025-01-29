@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Button, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Link } from "expo-router";
 
 const HomeScreen = () => {
@@ -7,7 +7,10 @@ const HomeScreen = () => {
         <View style={styles.container}>
             <Text style={styles.header}>Home Screen</Text>
             <Link href="/pollScreen" style={styles.button}>
-                Go to Poll
+                <Text style={styles.buttonText}>Go to Poll Creation Screen</Text>
+            </Link>
+            <Link href="/pollView" style={styles.button}>
+                <Text style={styles.buttonText}>View Polls</Text>
             </Link>
         </View>
     );
@@ -25,13 +28,17 @@ const styles = StyleSheet.create({
     header: {
         fontSize: 24,
         fontWeight: "bold",
+        marginBottom: 20,
     },
     button: {
-        marginTop: 20,
-        padding: 10,
         backgroundColor: "#007bff",
-        color: "#fff",
+        padding: 10,
         borderRadius: 5,
-        textAlign: "center",
+        alignItems: "center",
+        marginTop: 10,
+    },
+    buttonText: {
+        color: "#ffffff",
+        fontSize: 16,
     },
 });

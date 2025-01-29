@@ -36,5 +36,4 @@ app.use('/admin', adminRouter);
 // Start the server
 app.listen(PORT, "0.0.0.0", () => { // Bind to all network interfaces
     console.log(`Server is running on http://0.0.0.0:${PORT}`);
-    console.log(`Accessible on your network at http://192.168.0.230:${PORT}`); // Replace with your actual local IP
 });
