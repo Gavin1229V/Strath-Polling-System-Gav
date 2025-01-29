@@ -54,7 +54,25 @@ io.on("connection", async (socket) => {
     });
 });
 
+// Function to get the local IP address
+const getLocalIpAddress = () => {
+    const { networkInterfaces } = require('os');
+    const nets = networkInterfaces();
+    let localIp = 'localhost';
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            if (net.family === 'IPv4' && !net.internal) {
+                localIp = net.address;
+                break;
+            }
+        }
+    }
+    return localIp;
+};
+
 // Start the server
 server.listen(PORT, () => {
+    const localIp = getLocalIpAddress();
     console.log(`Server is running on port ${PORT}`);
+    console.log(`Connect to the server at http://${localIp}:${PORT}`);
 });

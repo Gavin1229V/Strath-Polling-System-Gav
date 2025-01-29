@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, FlatList, Button, ScrollView, Dimensions } from "react-native";
+import { View, Text, FlatList, Button, Dimensions } from "react-native";
 import { io } from "socket.io-client";
 import { PieChart } from "react-native-chart-kit";
 import Animated, { Layout, FadeIn, FadeOut } from "react-native-reanimated";
@@ -105,17 +105,12 @@ const PollView = () => {
     };
 
     return (
-        <ScrollView style={styles.container}>
-            {polls.length === 0 ? (
-                <Text>No polls available</Text>
-            ) : (
-                <FlatList
-                    data={polls}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={renderPoll}
-                />
-            )}
-        </ScrollView>
+        <FlatList
+            style={styles.container}
+            data={polls}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderPoll}
+        />
     );
 };
 

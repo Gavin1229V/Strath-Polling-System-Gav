@@ -18,7 +18,6 @@ router.get("/polls", async (req, res) => {
 
 router.post("/polls", async (req, res) => {
     const { question, options } = req.body;
-    console.log("POST /polls request received with data:", req.body);
 
     if (!question || !Array.isArray(options)) {
         console.error("Invalid input:", req.body);
@@ -37,7 +36,6 @@ router.post("/polls", async (req, res) => {
 
 router.post("/vote/:optionId", async (req, res) => {
     const { optionId } = req.params;
-    console.log("POST /vote request received for option ID:", optionId);
 
     try {
         await vote(optionId);
