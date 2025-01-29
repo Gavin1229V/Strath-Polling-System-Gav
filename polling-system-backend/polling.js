@@ -1,42 +1,5 @@
 const { connectionPromise, getConnection } = require("./db"); // Import MySQL connection and connection promise
 
-// Test database connection
-const testDatabaseConnection = async () => {
-    console.log("[DEBUG] polling.js: Testing database connection...");
-    try {
-        await connectionPromise; // Ensure the connection is established
-        const connection = getConnection(); // Get the connection
-
-        // Test query to check if the connection is working
-        const testQuery = `SELECT 1 + 1 AS solution`;
-        const [rows] = await connection.query(testQuery);
-        console.log("[DEBUG] Test query executed successfully:", rows);
-
-        // Additional query to check if the polls table exists
-        const checkPollsTableQuery = `SHOW TABLES LIKE 'polls'`;
-        const [pollsTableRows] = await connection.query(checkPollsTableQuery);
-        if (pollsTableRows.length > 0) {
-            console.log("[DEBUG] Polls table exists.");
-
-            // Fetch a row from the polls table
-            const fetchPollQuery = `SELECT * FROM polls LIMIT 1`;
-            const [pollRows] = await connection.query(fetchPollQuery);
-            if (pollRows.length > 0) {
-                console.log("[DEBUG] polling.js: Sample row from polls table:", pollRows[0]);
-            } else {
-                console.log("[DEBUG] No rows found in polls table.");
-            }
-        } else {
-            console.log("[DEBUG] Polls table does not exist.");
-        }
-    } catch (err) {
-        console.error("[ERROR] Failed to connect to MySQL:", err);
-    }
-};
-
-// Call the test function immediately
-testDatabaseConnection();
-
 // Create a new poll
 const createPoll = async (question, options) => {
     await connectionPromise; // Ensure the connection is established
@@ -93,7 +56,6 @@ const getPolls = async () => {
 
         const [rows] = await connection.query(query);
 
-        console.log("[DEBUG] Polls fetched:", rows);
 
         // Group polls and their options
         const polls = rows.reduce((acc, row) => {
@@ -109,7 +71,6 @@ const getPolls = async () => {
             return acc;
         }, {});
 
-        console.log("[DEBUG] Grouped polls:", polls);
         return Object.values(polls);
     } catch (error) {
         console.error("[ERROR] Error fetching polls:", error);

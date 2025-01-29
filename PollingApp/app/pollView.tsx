@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, Button, Dimensions } from "react-native";
 import { BarChart } from "react-native-chart-kit";
+import { io } from "socket.io-client";
 import styles from "./styles";
 import { fetchPolls } from "./global";
 import { SERVER_IP } from "./config";
@@ -25,6 +26,16 @@ const PollView = () => {
 
     useEffect(() => {
         fetchPolls(setPolls);
+
+        const socket = io(SERVER_IP);
+        socket.on("pollsUpdated", (updatedPolls: Poll[]) => {
+            console.log("Received pollsUpdated event with data:", updatedPolls);
+            setPolls(updatedPolls);
+        });
+
+        return () => {
+            socket.disconnect();
+        };
     }, []);
 
     // Cast a vote for an option
@@ -37,7 +48,7 @@ const PollView = () => {
                 throw new Error(`Error voting: ${response.statusText}`);
             }
             setVoteStatus("Vote successfully recorded!");
-            fetchPolls(setPolls);
+            // No need to fetch polls again, as the server will emit the update
         } catch (err) {
             console.error("Error voting:", err);
             setVoteStatus("Failed to record vote.");
