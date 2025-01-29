@@ -11,6 +11,11 @@ const styles = StyleSheet.create({
         textAlign: "center",
         marginVertical: 20,
     },
+    questionText: {
+        fontSize: 18,
+        fontWeight: "bold",
+        marginVertical: 10,
+    },
     subHeader: {
         fontSize: 20,
         fontWeight: "bold",

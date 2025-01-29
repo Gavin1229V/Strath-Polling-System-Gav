@@ -44,16 +44,13 @@ io.on("connection", async (socket) => {
         // Insert new poll into the database (not shown here)
         const polls = await getPolls();
         io.emit("pollsUpdated", polls); // Emit update
-        console.log("Emitting pollsUpdated event with data:", polls);
     });
 
     socket.on("vote", async (optionId) => {
         console.log("Received vote for option ID:", optionId);
         await vote(optionId);
         const polls = await getPolls();
-        console.log("Polls after update:", polls);
         io.emit("pollsUpdated", polls); // Emit update
-        console.log("Emitting pollsUpdated event with data:", polls);
     });
 });
 

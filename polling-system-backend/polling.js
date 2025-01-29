@@ -52,7 +52,6 @@ const getPolls = async () => {
                        FROM polls p 
                        LEFT JOIN poll_options po ON p.id = po.poll_id
                        ORDER BY p.id, po.option_index`;
-        console.log("[DEBUG] Executing query:", query);
 
         const [rows] = await connection.query(query);
 
@@ -92,7 +91,6 @@ const vote = async (optionId) => {
 
     try {
         const query = `UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?`;
-        console.log("[DEBUG] Executing query:", query, { optionId });
 
         const [result] = await connection.query(query, [optionId]);
 
