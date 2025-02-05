@@ -1,1 +1,1 @@
-export const SERVER_IP = "http://192.168.0.230:3001";
+export const SERVER_IP = "http://10.12.48.108:3001";
