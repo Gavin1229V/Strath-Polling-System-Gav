@@ -8,6 +8,7 @@ export default function RootLayout() {
             {/* Stack Navigation */}
             <View style={styles.content}>
                 <Stack>
+                    <Stack.Screen name="register_page" options={{ title: "Register" }} />
                     <Stack.Screen name="index" options={{ title: "Home" }} />
                     <Stack.Screen name="pollScreen" options={{ title: "Poll Creation" }} />
                     <Stack.Screen name="pollView" options={{ title: "Poll Viewer" }} />

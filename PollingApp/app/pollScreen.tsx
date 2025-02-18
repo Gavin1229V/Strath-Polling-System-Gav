@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, Button, Alert, Dimensions } from "react-native";
-import { Link } from "expo-router";
 import styles from "./styles";
 import { fetchPolls } from "./global";
 import { SERVER_IP } from "./config";
