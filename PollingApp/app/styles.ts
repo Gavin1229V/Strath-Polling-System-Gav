@@ -5,6 +5,35 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#f5f5f5",
     },
+    // HomeScreen-specific styles moved from index.tsx:
+    homeContainer: {
+        flex: 1,
+        padding: 20,
+        backgroundColor: "#f5f5f5",
+        alignItems: "center",
+    },
+    profileContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 20,
+    },
+    profilePic: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: "#ccc",
+        marginRight: 10,
+    },
+    profileName: {
+        fontSize: 18,
+        fontWeight: "bold",
+    },
+    homeHeader: {
+        fontSize: 24,
+        fontWeight: "bold",
+        marginBottom: 20,
+    },
+    // Existing styles:
     header: {
         fontSize: 24,
         fontWeight: "bold",
