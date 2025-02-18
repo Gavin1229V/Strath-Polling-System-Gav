@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import styles from "./styles";
+import { SERVER_IP } from "./config";
 
 const roles = [
   { label: "Student", value: 1 },
@@ -22,7 +23,7 @@ const RegisterPage: React.FC = () => {
 
     try {
       // Replace with the URL for your backend register endpoint.
-      const response = await fetch("http://your-backend-api/register", {
+      const response = await fetch(`${SERVER_IP}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, role }),

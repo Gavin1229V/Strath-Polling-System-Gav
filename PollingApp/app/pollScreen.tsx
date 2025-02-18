@@ -21,7 +21,6 @@ const PollScreen = () => {
     const [newPoll, setNewPoll] = useState({ question: "", options: ["", ""] });
     const [voteStatus, setVoteStatus] = useState("");
 
-    const screenWidth = Dimensions.get("window").width;
 
     useEffect(() => {
         fetchPolls(setPolls);
