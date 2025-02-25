@@ -1,26 +1,47 @@
+// app/index.tsx
 import React from "react";
-import { View, Text, Image, TouchableOpacity } from "react-native";
-import { Link } from "expo-router";
-import styles from "./styles";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useRouter } from "expo-router";
 
-const HomeScreen = () => {
+const StartPage = () => {
+  const router = useRouter();
+
   return (
-    <View style={styles.homeContainer}>
-      <View style={styles.profileContainer}>
-        <Image
-          style={styles.profilePic}
-          source={{ uri: "https://via.placeholder.com/100" }}
-        />
-        <Text style={styles.profileName}>Person's Name</Text>
-      </View>
-      <Text style={styles.homeHeader}>You are a Student</Text>
-      <Link href="/register_page" asChild>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Register</Text>
-        </TouchableOpacity>
-      </Link>
+    <View style={styles.container}>
+      <Text style={styles.title}>Welcome to Simpoll!</Text>
+      <TouchableOpacity style={styles.button} onPress={() => router.push("/login")}>
+        <Text style={styles.buttonText}>Login</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={() => router.push("/register_page")}>
+        <Text style={styles.buttonText}>Register</Text>
+      </TouchableOpacity>
     </View>
   );
 };
 
-export default HomeScreen;
+export default StartPage;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 40,
+  },
+  button: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginVertical: 10,
+  },
+  buttonText: {
+    color: "#FFF",
+    fontSize: 18,
+  },
+});

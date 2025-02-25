@@ -1,9 +1,17 @@
 import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
+  // General background and screen layout
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F5F5F5",
+    padding: 20,
+  },
+  // Centered content container (for auth pages, etc.)
+  screenContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   // HomeScreen-specific styles
   homeContainer: {
@@ -33,17 +41,20 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
   },
-  // Existing styles
+  
   header: {
     fontSize: 24,
     fontWeight: "bold",
+    color: "#333",
     textAlign: "center",
-    marginVertical: 20,
+    marginBottom: 20,
   },
+  // Poll question style
   questionText: {
     fontSize: 18,
     fontWeight: "bold",
     marginVertical: 10,
+    color: "#333",
   },
   subHeader: {
     fontSize: 20,
@@ -53,23 +64,26 @@ const styles = StyleSheet.create({
   pollSection: {
     padding: 20,
   },
+  // Input styling shared across forms
   input: {
+    width: "100%",
     borderWidth: 1,
     borderColor: "#ccc",
-    padding: 10,
-    marginVertical: 5,
     borderRadius: 5,
+    padding: 10,
+    marginVertical: 7,
   },
+  // Poll-specific card style
   pollCard: {
     backgroundColor: "#fff",
     padding: 20,
     marginVertical: 10,
     borderRadius: 5,
+    elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 5,
-    elevation: 3,
   },
   pollQuestion: {
     fontSize: 18,
@@ -88,8 +102,9 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   // Additional styles for registration
+  // Button styling (same as login.tsx button style)
   button: {
-    backgroundColor: "#007BFF",
+    backgroundColor: "#007AFF",
     padding: 15,
     borderRadius: 5,
     alignItems: "center",
@@ -97,9 +112,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
-    textAlign: "center",
   },
   // Dropdown styles
   dropdown: {
@@ -124,6 +138,27 @@ const styles = StyleSheet.create({
   },
   dropdownItemText: {
     fontSize: 16,
+  },
+  // Navbar styling to be consistent across all pages where it's shown
+  navbar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    height: 60,
+    backgroundColor: "#007BFF",
+    width: "100%",
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+    position: "absolute",
+    bottom: 0,
+  },
+  navButton: {
+    padding: 10,
+  },
+  navText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
 
