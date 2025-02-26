@@ -6,12 +6,15 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "skipLibCheck": true, // Skip type checking of library declaration files
+    "types": []         // Only include explicitly defined type definitions
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-, "app/styles.ts"  ]
+    "expo-env.d.ts",
+    "app/styles.ts"
+  ]
 }
