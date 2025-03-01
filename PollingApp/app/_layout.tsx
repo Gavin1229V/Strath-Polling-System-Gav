@@ -8,7 +8,7 @@ function InnerLayout() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const hideNavBarRoutes = ["/", "/login", "/register_page"];
+  const hideNavBarRoutes = ["/", "/login", "/registerPage"];
   const shouldHideNavBar = hideNavBarRoutes.includes(pathname);
 
   return (
@@ -30,7 +30,6 @@ function InnerLayout() {
             name="index"
             options={{
               title: "Welcome",
-              headerShown: false,
             }}
           />
           <Stack.Screen
@@ -41,7 +40,7 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="register_page"
+            name="registerPage"
             options={{
               title: "Register",
               headerBackVisible: true,

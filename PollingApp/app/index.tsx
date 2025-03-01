@@ -13,15 +13,15 @@ const StartPage = () => {
         {/* Grey box container */}
         <View style={styles.greyBox}>
           <Text style={styles.title}>Welcome to Simpoll!</Text>
-          <TouchableOpacity style={styles.button} onPress={() => router.push("/login")}>
+          <TouchableOpacity style={styles.button} onPress={() => router.push("./login")}>
             <Text style={styles.buttonText}>Login</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={() => router.push("/register_page")}>
+          <TouchableOpacity style={styles.button} onPress={() => router.push("./registerPage")}>
             <Text style={styles.buttonText}>Register</Text>
           </TouchableOpacity>
         </View>
       </View>
-      <Text style={styles.credit}>A 4th year project by Gavin Verma</Text>
+      <Text style={styles.credit}>A 4th year project by Gavin Verma            </Text>
     </ImageBackground>
   );
 };
