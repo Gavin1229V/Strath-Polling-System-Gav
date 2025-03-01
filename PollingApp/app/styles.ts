@@ -66,7 +66,8 @@ const styles = StyleSheet.create({
   },
   // Input styling shared across forms
   input: {
-    width: "100%",
+    width: "90%", // changed from flex: 1 and width: "100%"
+    alignSelf: "center", // added to center the input horizontally evenly
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 5,
@@ -95,6 +96,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 5,
+  },
+  optionContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
   },
   status: {
     textAlign: "center",
@@ -159,6 +165,16 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  removeButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  removeButton: {
+    marginLeft: 10,
+    padding: 10,
+    backgroundColor: "red",
+    borderRadius: 5,
   },
 });
 

@@ -3,21 +3,19 @@ import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import styles from "./styles";
 import { SERVER_IP } from "./config";
 
-const roles = [
-  { label: "Student", value: 1 },
-  { label: "Student Rep", value: 2 },
-  { label: "Lecturer", value: 3 },
-];
-
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const [role, setRole] = useState<number>(1); // Default to Student
-  const [dropdownVisible, setDropdownVisible] = useState<boolean>(false);
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
 
   const handleRegister = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Email and password are required.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match.");
       return;
     }
 
@@ -26,7 +24,7 @@ const RegisterPage: React.FC = () => {
       const response = await fetch(`${SERVER_IP}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
@@ -46,7 +44,6 @@ const RegisterPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Register</Text>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -62,31 +59,13 @@ const RegisterPage: React.FC = () => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      {/* Custom dropdown for selecting role */}
-      <TouchableOpacity
-        style={styles.dropdown}
-        onPress={() => setDropdownVisible(!dropdownVisible)}
-      >
-        <Text style={styles.dropdownText}>
-          {roles.find((r) => r.value === role)?.label}
-        </Text>
-      </TouchableOpacity>
-      {dropdownVisible && (
-        <View style={styles.dropdownContainer}>
-          {roles.map((item) => (
-            <TouchableOpacity
-              key={item.value}
-              style={styles.dropdownItem}
-              onPress={() => {
-                setRole(item.value);
-                setDropdownVisible(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm Password"
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+        secureTextEntry
+      />
       <TouchableOpacity style={styles.button} onPress={handleRegister}>
         <Text style={styles.buttonText}>Register</Text>
       </TouchableOpacity>

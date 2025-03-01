@@ -67,6 +67,14 @@ const registerAndSendEmail = async (email, password, role = 1) => {
     throw new Error("Invalid input: Email and password are required.");
   }
 
+  // Override the role based on email domain.
+  const emailLower = email.toLowerCase();
+  if (emailLower.endsWith("@uni.strath.ac.uk")) {
+    role = 0; // Student
+  } else if (emailLower.endsWith("@strath.ac.uk")) {
+    role = 3; // Lecturer
+  }
+
   console.log("[DEBUG] Registering user with email:", email, "and role:", role);
 
   // Generate a unique verification key for this user.

@@ -50,6 +50,12 @@ const PollScreen = () => {
     }
   };
 
+  const removeOption = (index: number) => {
+    const options = [...newPoll.options];
+    options.splice(index, 1);
+    setNewPoll({ ...newPoll, options });
+  };
+
   return (
     <View style={styles.container}>
       <View style={{ width: "100%" }}>
@@ -61,17 +67,26 @@ const PollScreen = () => {
           onChangeText={(text) => setNewPoll({ ...newPoll, question: text })}
         />
         {newPoll.options.map((option, index) => (
-          <TextInput
-            key={index}
-            style={styles.input}
-            placeholder={`Option ${index + 1}`}
-            value={option}
-            onChangeText={(text) => {
-              const options = [...newPoll.options];
-              options[index] = text;
-              setNewPoll({ ...newPoll, options });
-            }}
-          />
+          <View key={index} style={styles.optionContainer}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder={`Option ${index + 1}`}
+              value={option}
+              onChangeText={(text) => {
+                const options = [...newPoll.options];
+                options[index] = text;
+                setNewPoll({ ...newPoll, options });
+              }}
+            />
+            {newPoll.options.length > 2 && (
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => removeOption(index)}
+              >
+                <Text style={styles.removeButtonText}>Remove</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         ))}
         <TouchableOpacity
           style={styles.button}

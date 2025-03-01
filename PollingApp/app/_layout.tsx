@@ -1,25 +1,36 @@
 import React from "react";
-import { Stack, usePathname, Link } from "expo-router";
+import { Stack, usePathname, Link, useRouter } from "expo-router";
 import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 function InnerLayout() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
 
-  // Define routes where the navbar should be hidden
   const hideNavBarRoutes = ["/", "/login", "/register_page"];
   const shouldHideNavBar = hideNavBarRoutes.includes(pathname);
 
   return (
     <View style={styles.container}>
+      {user && pathname === "/home" && (
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={() => {
+            setUser(null);
+            router.replace("/"); // Redirect to index on logout
+          }}
+        >
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.content}>
         <Stack>
           <Stack.Screen
             name="index"
             options={{
               title: "Welcome",
-              headerBackVisible: false,
+              headerShown: false,
             }}
           />
           <Stack.Screen
@@ -39,9 +50,7 @@ function InnerLayout() {
           <Stack.Screen
             name="home"
             options={{
-              title: "Home",
-              headerBackVisible: false,
-              headerLeft: () => null,
+            headerShown: false,
             }}
           />
           <Stack.Screen
@@ -63,7 +72,6 @@ function InnerLayout() {
         </Stack>
       </View>
 
-      {/* Render the bottom nav bar only if the current route is not in hideNavBarRoutes */}
       {!shouldHideNavBar && (
         <View style={styles.navbar}>
           <Link href="/home" asChild>
@@ -121,6 +129,20 @@ const styles = StyleSheet.create({
   navText: {
     color: "#ffffff",
     fontSize: 16,
+    fontWeight: "bold",
+  },
+  logoutButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#FF3B30",
+    borderRadius: 5,
+    zIndex: 1,
+  },
+  logoutText: {
+    color: "#fff",
     fontWeight: "bold",
   },
 });

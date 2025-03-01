@@ -15,7 +15,7 @@ router.get("/verify", async (req, res) => {
     console.log("[DEBUG] Token verified for login ID:", loginId, "and email:", email, "with unique key:", jti);
 
     const connection = getConnection();
-    // Update the user's record if the provided unique key matches the one stored in the database.
+    // Update the user's record
     const updateQuery = "UPDATE logins SET is_verified = 1 WHERE login_id = ? AND email = ? AND verification_key = ?";
     console.log("[DEBUG] Executing email verification SQL query:", updateQuery, "with values:", loginId, email, jti);
     const [result] = await connection.query(updateQuery, [loginId, email, jti]);
