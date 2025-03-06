@@ -1,22 +1,26 @@
 const { connectionPromise, getConnection } = require("./db"); // Import MySQL connection and connection promise
 
-// Create a new poll
-const createPoll = async (question, options) => {
+// Create a new poll with author and created_at
+const createPoll = async (question, options, author) => {
     await connectionPromise; // Ensure the connection is established
-    const connection = getConnection(); // Get the connection
+    const connection = await getConnection(); // Updated: await getConnection
 
     if (!question || !Array.isArray(options) || options.length < 2) {
         console.error("[DEBUG] Invalid input: question or options are not valid.", { question, options });
         throw new Error("Invalid input: Poll must have a question and at least two options.");
     }
 
+    // Replace the old Date format with MySQL datetime format
+    // Old code: const createdAt = new Date().toISOString();
+    const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
     console.log("[DEBUG] Creating poll with question:", question);
     console.log("[DEBUG] Options provided:", options);
+    console.log("[DEBUG] Poll author:", author);
 
     try {
-        // Insert poll into the database
-        const query = `INSERT INTO polls (question) VALUES (?)`;
-        const [result] = await connection.query(query, [question]);
+        // Updated: Insert poll with question, created_by, and created_at
+        const query = `INSERT INTO polls (question, created_by, created_at) VALUES (?, ?, ?)`;
+        const [result] = await connection.query(query, [question, author, createdAt]);
         const pollId = result.insertId;
 
         console.log("[DEBUG] Poll created with ID:", pollId);
@@ -43,23 +47,29 @@ const createPoll = async (question, options) => {
 // Get all polls with their options
 const getPolls = async () => {
     await connectionPromise; // Ensure the connection is established
-    const connection = getConnection(); // Get the connection
-
-    console.log("[DEBUG] Fetching all polls with their options");
-
     try {
-        const query = `SELECT p.id, p.question, po.id AS option_id, po.option_index, po.option_text, po.vote_count 
+        const connection = await getConnection(); // Updated: await getConnection
+
+        console.log("[DEBUG] Fetching all polls with their options");
+
+        const query = `SELECT p.id, p.question, p.created_by, p.created_at, 
+                              po.id AS option_id, po.option_index, po.option_text, po.vote_count 
                        FROM polls p 
                        LEFT JOIN poll_options po ON p.id = po.poll_id
                        ORDER BY p.id, po.option_index`;
 
         const [rows] = await connection.query(query);
 
-
-        // Group polls and their options
+        // Group polls and their options, including author and created date
         const polls = rows.reduce((acc, row) => {
             if (!acc[row.id]) {
-                acc[row.id] = { id: row.id, question: row.question, options: [] };
+                acc[row.id] = { 
+                    id: row.id, 
+                    question: row.question, 
+                    created_by: row.created_by, 
+                    created_at: row.created_at,
+                    options: [] 
+                };
             }
             acc[row.id].options.push({
                 id: row.option_id,
@@ -72,7 +82,7 @@ const getPolls = async () => {
 
         return Object.values(polls);
     } catch (error) {
-        console.error("[ERROR] Error fetching polls:", error);
+        console.error("Failed to fetch polls on connection:", error);
         throw new Error("Failed to fetch polls.");
     }
 };
@@ -80,7 +90,7 @@ const getPolls = async () => {
 // Vote for an option
 const vote = async (optionId) => {
     await connectionPromise; // Ensure the connection is established
-    const connection = getConnection(); // Get the connection
+    const connection = await getConnection(); // Updated: await getConnection
 
     if (!optionId) {
         console.error("[DEBUG] Invalid input: Option ID is required.");

@@ -1,27 +1,33 @@
 import React from "react";
-import { View, Text, Image, StyleSheet } from "react-native";
-import { useAuth } from "./AuthContext";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useAuth, useFirstName, useLastName } from "./userDetails";
+import { useRouter } from "expo-router";
 
 const HomeScreen = () => {
-  const { user } = useAuth();
-
-  const rawFirstName =
-    user && user.email ? user.email.split(".")[0] : "";
-  const firstName =
-    rawFirstName.length > 0
-      ? rawFirstName.charAt(0).toUpperCase() + rawFirstName.slice(1)
-      : "";
-
+  const { user, setUser } = useAuth();
+  const router = useRouter();
+  
+  const firstName = useFirstName();
+  const lastName = useLastName();
+  
   return (
     <View style={styles.homeContainer}>
       <View style={styles.profileContainer}>
-        <Image
-          style={styles.profilePic}
-          source={{ uri: "https://via.placeholder.com/200.png" }} // Updated URI with .png extension
-          onError={(e) => console.error("Image load error:", e.nativeEvent.error)}
-        />
-        <Text style={styles.profileName}>Welcome, {firstName}</Text>
+        <Text style={styles.profileName}>
+          Welcome, {firstName} {lastName}
+        </Text>
       </View>
+      {user && (
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={() => {
+            setUser(null);
+            router.replace("/");
+          }}
+        >
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -29,9 +35,9 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   homeContainer: {
     flex: 1,
-    justifyContent: "flex-start", // Changed from "center"
+    justifyContent: "flex-start",
     alignItems: "center",
-    paddingTop: 50, // Added top padding to adjust vertical position
+    paddingTop: 50,
   },
   profileContainer: {
     alignItems: "center",
@@ -44,6 +50,17 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 24,
     marginTop: 16,
+  },
+  logoutButton: {
+    backgroundColor: "#FF3B30",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+    marginTop: 20,
+  },
+  logoutText: {
+    color: "#FFF",
+    fontWeight: "bold",
   },
 });
 

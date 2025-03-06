@@ -9,18 +9,17 @@ router.get("/verify", async (req, res) => {
     return res.status(400).send("Verification token is missing.");
   }
   try {
-    // Decode the token to retrieve loginId, email, and the unique verification key (jti)
+    console.log("[DEBUG] Received token:", token);
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     const { loginId, email, jti } = payload;
-    console.log("[DEBUG] Token verified for login ID:", loginId, "and email:", email, "with unique key:", jti);
+    console.log("[DEBUG] Token payload:", payload);
 
-    const connection = getConnection();
-    // Update the user's record
+    // Use await for getConnection to ensure a valid connection object.
+    const connection = await getConnection();
     const updateQuery = "UPDATE logins SET is_verified = 1 WHERE login_id = ? AND email = ? AND verification_key = ?";
-    console.log("[DEBUG] Executing email verification SQL query:", updateQuery, "with values:", loginId, email, jti);
-    const [result] = await connection.query(updateQuery, [loginId, email, jti]);
+    // Use execute instead of query
+    const [result] = await connection.execute(updateQuery, [loginId, email, jti]);
 
-    // Check if a record was updated.
     if (result.affectedRows === 0) {
       throw new Error("Verification key does not match or user not found.");
     }
@@ -29,7 +28,7 @@ router.get("/verify", async (req, res) => {
     res.send("Email verification successful. You can now log in.");
   } catch (error) {
     console.error("[ERROR] Email verification error:", error);
-    res.status(400).send("Invalid or expired token.");
+    res.status(400).send("Invalid or expired token. " + error.message);
   }
 });
 

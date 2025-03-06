@@ -2,23 +2,25 @@ import React, { useEffect, useState, useRef } from "react";
 import { View, Text, FlatList, Button, Dimensions, StyleSheet } from "react-native";
 import { io } from "socket.io-client";
 import { PieChart } from "react-native-chart-kit";
-import Animated, { Layout, FadeIn, FadeOut } from "react-native-reanimated";
-import styles from "./styles";
+import styles from "../styles/styles";
 import { fetchPolls } from "./global";
 import { SERVER_IP } from "./config";
 
+// Define local types with the extra fields
+interface PollOption {
+  id: number;
+  text: string;
+  votes: number;
+}
+interface Poll {
+  id: number;
+  question: string;
+  created_by: string;
+  created_at: string;
+  options: PollOption[];
+}
+
 const PollView = () => {
-    interface PollOption {
-        id: number;
-        text: string;
-        votes: number;
-    }
-    
-    interface Poll {
-        id: number;
-        question: string;
-        options: PollOption[];
-    }
 
     const [polls, setPolls] = useState<Poll[]>([]);
     const socketRef = useRef(io(SERVER_IP));
@@ -56,33 +58,32 @@ const PollView = () => {
             votes: option.votes,
             color: colors[index % colors.length],
             legendFontColor: "#000",
-            legendFontSize: 12
+            legendFontSize: 12,
         }));
 
         return (
-            <Animated.View 
-                entering={FadeIn} 
-                exiting={FadeOut} 
-                layout={Layout.springify()} 
-                style={{ marginVertical: 20 }}
-            >
+            <View style={{ marginVertical: 20 }}>
                 <Text style={styles.questionText}>{poll.question}</Text>
+                <Text style={{ fontSize: 12, color: "#000" }}>
+                  {`By: ${poll.created_by} - ${new Date(poll.created_at).toLocaleString()}`}
+                </Text>
                 <PieChart
                     data={data}
                     width={screenWidth - 40}
                     height={220}
                     chartConfig={{
-                        backgroundGradientFrom: "#fff",
-                        backgroundGradientTo: "#fff",
+                        backgroundGradientFrom: "transparent",
+                        backgroundGradientTo: "transparent",
                         color: () => `rgba(0, 0, 0, 1)`,
                         labelColor: () => `rgba(0, 0, 0, 1)`,
+                        decimalPlaces: 0,
                     }}
                     accessor={"votes"}
                     backgroundColor={"transparent"}
                     paddingLeft={"10"}
                     absolute
                 />
-            </Animated.View>
+            </View>
         );
     };
 

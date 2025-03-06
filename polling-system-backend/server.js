@@ -6,11 +6,12 @@ const socketIo = require("socket.io");
 const fs = require("fs");
 const path = require("path");
 
-const router = require("./router");
+const router = require("./pollRouter");
 const { getPolls, vote } = require("./polling");
 const { registerAndSendEmail, verifyEmail } = require("./register");
 const { loginUser } = require("./login");
 const verificationRouter = require("./verify");
+const { getAccountDetails } = require("./accountDetailGetter");
 
 const app = express();
 const server = http.createServer(app);
@@ -73,11 +74,25 @@ app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
   console.log("[INFO] Login request for email:", email);
   try {
-    const token = await loginUser(email, password);
-    res.status(200).json({ message: "Login successful", token });
+    const { token, userDetails } = await loginUser(email, password);
+    res.status(200).json({ message: "Login successful", token, userDetails });
   } catch (error) {
     console.error("[ERROR] Login error for email:", email, error);
     res.status(400).json({ message: error.message || "Login failed" });
+  }
+});
+
+app.get("/accountDetails", async (req, res) => {
+  const userId = req.query.userId; // In a real app, get user id via auth middleware.
+  if (!userId) {
+    return res.status(400).send("User ID is required.");
+  }
+  try {
+    const details = await getAccountDetails(userId);
+    res.json(details);
+    console.log(details);
+  } catch (error) {
+    res.status(500).send(error.message);
   }
 });
 
@@ -152,6 +167,4 @@ server.listen(PORT, () => {
   } catch (err) {
     console.error("[ERROR] Unable to update .env file", err);
   }
-
-  
 });

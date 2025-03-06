@@ -26,13 +26,17 @@ const connectToDatabase = async () => {
     }
 };
 
-const connectionPromise = connectToDatabase();
-
-const getConnection = () => {
+async function initConnection() {
     if (!connection) {
-        throw new Error("Connection not established");
+        await connectToDatabase();
+    }
+}
+
+const getConnection = async () => {
+    if (!connection) {
+        await initConnection();
     }
     return connection;
 };
 
-module.exports = { connectionPromise, getConnection };
+module.exports = { getConnection };

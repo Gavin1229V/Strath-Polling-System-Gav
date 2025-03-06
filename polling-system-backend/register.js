@@ -58,8 +58,8 @@ const sendVerificationEmail = async (email, loginId, verificationKey) => {
 const registerAndSendEmail = async (email, password, role = 1) => {
   console.log("[DEBUG] Starting registerAndSendEmail function.");
 
-  await connectionPromise; // Ensure the connection is established
-  const connection = getConnection();
+  // Get a valid connection by awaiting getConnection.
+  const connection = await getConnection();
   console.log("[DEBUG] Obtained database connection:", connection.threadId || "No threadId available");
 
   if (!email || !password) {
@@ -70,7 +70,7 @@ const registerAndSendEmail = async (email, password, role = 1) => {
   // Override the role based on email domain.
   const emailLower = email.toLowerCase();
   if (emailLower.endsWith("@uni.strath.ac.uk")) {
-    role = 0; // Student
+    role = 1; // Set student role to 1
   } else if (emailLower.endsWith("@strath.ac.uk")) {
     role = 3; // Lecturer
   }

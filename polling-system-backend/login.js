@@ -1,20 +1,21 @@
 require("dotenv").config();
 const { connectionPromise, getConnection } = require("./db"); // MySQL connection and promise
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 /**
  * Log a user in by verifying credentials and ensuring their email is verified.
  * @param {string} email - The user’s email address.
  * @param {string} password - The user’s password.
- * @returns {string} A JWT token for the session.
+ * @returns {Object} An object containing a JWT token for the session and user details.
  * @throws {Error} If the user is not found, password is incorrect, or email isn’t verified.
  */
 const loginUser = async (email, password) => {
   await connectionPromise; // Ensure the database connection is ready
-  const connection = getConnection();
+  const connection = await getConnection(); // Await the connection
   
   // Query the database for a user with the given email
-  const query = "SELECT login_id, password, is_verified FROM logins WHERE email = ?";
+  const query = "SELECT login_id, user_id, email, password, role, is_verified, verification_key, created_at FROM logins WHERE email = ?";
   const [rows] = await connection.query(query, [email]);
   
   if (rows.length === 0) {
@@ -23,8 +24,15 @@ const loginUser = async (email, password) => {
   
   const user = rows[0];
   
-  // Validate password (in production, use hashed passwords and a secure comparison)
-  if (user.password !== password) {
+  // Validate password: use bcrypt only if the stored password is hashed
+  let passwordMatch;
+  if (user.password.startsWith('$2')) { // assumes bcrypt hash signature
+    passwordMatch = await bcrypt.compare(password, user.password);
+  } else {
+    passwordMatch = (password === user.password);
+  }
+  
+  if (!passwordMatch) {
     throw new Error("Incorrect password.");
   }
   
@@ -33,18 +41,14 @@ const loginUser = async (email, password) => {
     throw new Error("Email not verified. Please check your inbox for the verification email.");
   }
   
-  // Create and return a session JWT token
-  if (!process.env.JWT_SECRET) {
-    throw new Error("JWT_SECRET environment variable must be set.");
-  }
+  // Create token payload (you can include minimal info for the token)
+  const tokenPayload = { login_id: user.login_id, email: user.email, role: user.role };
+  const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: "1h" });
   
-  const token = jwt.sign(
-    { loginId: user.login_id, email },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" }
-  );
+  // Remove sensitive details if desired (here we remove the password)
+  delete user.password;
   
-  return token;
+  return { token, userDetails: user };
 };
 
 module.exports = { loginUser };

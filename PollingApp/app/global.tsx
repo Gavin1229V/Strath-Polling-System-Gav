@@ -6,9 +6,12 @@ type PollOption = {
     votes: number;
 };
 
-type Poll = {
+// Updated Poll type to include created_by and created_at
+export type Poll = {
     id: number;
     question: string;
+    created_by: string;
+    created_at: string;
     options: PollOption[];
 };
 
