@@ -55,7 +55,7 @@ export default StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     marginVertical: 10,
-    width: width < 375 ? "70%" : 200,
+    width: "100%", // updated width to match input boxes
     alignItems: "center",
   },
   buttonText: {
@@ -74,5 +74,15 @@ export default StyleSheet.create({
     right: 10,
     fontSize: 10,
     color: "#FFF",
+  },
+  passwordStrength: {
+    marginBottom: 10,
+    fontSize: 14,
+    color: "#007AFF", // default color; will be overridden inline
+  },
+  strengthSlider: {
+    width: "100%",
+    height: 40,
+    marginVertical: 10,
   },
 });

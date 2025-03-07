@@ -1,21 +1,48 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ImageBackground,
   Alert,
   Dimensions,
   ActivityIndicator,
+  Animated,    // 1) Import Animated
+  Easing,
 } from "react-native";
+// Remove Slider import
+// import Slider from "@react-native-community/slider";
+
 import { useRouter } from "expo-router";
 import { SERVER_IP } from "./config";
 import { useAuth } from "./userDetails";
 import { Asset } from "expo-asset";
+import authStyles from "../styles/authStyles";
 
 const bgImage = require("../assets/images/StrathBG_Index.jpg");
+
+const computeEntropy = (pwd: string): number => {
+  let pool = 0;
+  if (/[a-z]/.test(pwd)) pool += 26;
+  if (/[A-Z]/.test(pwd)) pool += 26;
+  if (/[0-9]/.test(pwd)) pool += 10;
+  if (/[^a-zA-Z0-9]/.test(pwd)) pool += 33;
+  return pwd.length * Math.log2(pool || 1);
+};
+
+const getStrength = (entropy: number): string => {
+  if (entropy < 40) return "Weak";
+  if (entropy < 60) return "Moderate";
+  return "Strong";
+};
+
+const getSliderColor = (value: number): string => {
+  const frac = Math.min(Math.max(value / 100, 0), 1);
+  const r = Math.round(255 * (1 - frac));
+  const g = Math.round(255 * frac);
+  return `rgb(${r}, ${g}, 0)`;
+};
 
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -25,9 +52,23 @@ const RegisterPage: React.FC = () => {
   const router = useRouter();
   const { setUser } = useAuth();
 
+  // Keep the Animated.Value
+  const animatedStrength = useRef(new Animated.Value(0)).current;
+
+  // 1) Always run this (even if image isn't loaded yet)
   useEffect(() => {
     Asset.loadAsync(bgImage).then(() => setImageLoaded(true));
   }, []);
+
+  // 2) Always run this too (it will animate only if needed)
+  useEffect(() => {
+    Animated.timing(animatedStrength, {
+      toValue: Math.min(computeEntropy(password), 100),
+      duration: 300,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [password]);
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
@@ -36,6 +77,12 @@ const RegisterPage: React.FC = () => {
     }
     if (password !== confirmPassword) {
       Alert.alert("Error", "Passwords do not match.");
+      return;
+    }
+
+    const entropy = computeEntropy(password);
+    if (entropy < 60) {
+      Alert.alert("Error", "Password is too weak.");
       return;
     }
 
@@ -70,22 +117,34 @@ const RegisterPage: React.FC = () => {
     }
   };
 
+  // 3) If image isn’t loaded, just render a loader—but AFTER the hooks
   if (!imageLoaded) {
     return (
-      <View style={[styles.bg, { justifyContent: "center", alignItems: "center" }]}>
+      <View
+        style={[authStyles.bg, { justifyContent: "center", alignItems: "center" }]}
+      >
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
 
+  // 4) Now do the normal render if image is loaded
+  const passwordEntropy = computeEntropy(password);
+  const sliderValue = Math.min(passwordEntropy, 100);
+  const sliderColor = getSliderColor(sliderValue);
+  const passwordStrength = getStrength(passwordEntropy);
+  const animatedWidth = animatedStrength.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+  });
+
   return (
-    <ImageBackground source={bgImage} style={styles.bg}>
-      <View style={styles.container}>
-        <View style={styles.greyBox}>
-          <Text style={styles.title}>Register</Text>
-          <View style={styles.contentWrapper}>
+    <ImageBackground source={bgImage} style={authStyles.bg}>
+      <View style={authStyles.container}>
+        <View style={authStyles.greyBox}>
+          <View style={authStyles.contentWrapper}>
             <TextInput
-              style={styles.input}
+              style={authStyles.input}
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
@@ -93,93 +152,54 @@ const RegisterPage: React.FC = () => {
               keyboardType="email-address"
             />
             <TextInput
-              style={styles.input}
+              style={authStyles.input}
               placeholder="Password"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
             />
+            {/* Container for progress bar followed by strength label */}
+            <View style={{ width: "100%" }}>
+              <View
+                style={{
+                  width: "100%",
+                  height: 6,
+                  backgroundColor: "#ccc",
+                  borderRadius: 3,
+                  marginVertical: 10,
+                }}
+              >
+                <Animated.View
+                  style={{
+                    width: animatedWidth,
+                    height: "100%",
+                    backgroundColor: sliderColor,
+                    borderRadius: 3,
+                  }}
+                />
+              </View>
+              <Text style={[authStyles.passwordStrength, { color: sliderColor, marginLeft: 10 }]}>
+                {passwordStrength}
+              </Text>
+            </View>
             <TextInput
-              style={styles.input}
+              style={authStyles.input}
               placeholder="Confirm Password"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
             />
-            <TouchableOpacity style={styles.button} onPress={handleRegister}>
-              <Text style={styles.buttonText}>Register</Text>
+            <TouchableOpacity style={authStyles.button} onPress={handleRegister}>
+              <Text style={authStyles.buttonText}>Register</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity onPress={() => router.replace("/login")}>
-            <Text style={styles.switchText}>Already have an account? Login</Text>
+            <Text style={authStyles.switchText}>Already have an account? Login</Text>
           </TouchableOpacity>
         </View>
       </View>
     </ImageBackground>
   );
 };
-
-const { width, height } = Dimensions.get("window");
-
-const styles = StyleSheet.create({
-  bg: {
-    flex: 1,
-    width: width,
-    height: height,
-    resizeMode: "cover",
-  },
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  greyBox: {
-    backgroundColor: "rgba(240, 240, 240, 0.9)",
-    paddingVertical: 40,
-    paddingHorizontal: 30,
-    borderRadius: 12,
-    width: "80%",
-    maxWidth: 350,
-    alignItems: "center",
-  },
-  contentWrapper: {
-    marginTop: 20,
-    width: "100%",
-  },
-  input: {
-    width: "100%",
-    height: 40,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-    borderRadius: 6,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginVertical: 10,
-    width: "100%",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#FFF",
-    fontSize: 18,
-    textAlign: "center",
-  },
-  switchText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: "#007AFF",
-  },
-});
 
 export default RegisterPage;
