@@ -152,6 +152,12 @@ const RegisterPage: React.FC = () => {
     outputRange: ["0%", "100%"],
   });
 
+  // In render, compute animated color for strength slider:
+  const animatedStrengthColor = animatedStrength.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["red", "green"],
+  });
+
   // In render, compute animated width for match slider:
   const animatedMatchWidth = matchAnim.interpolate({
     inputRange: [0, 100],
@@ -178,7 +184,7 @@ const RegisterPage: React.FC = () => {
               onChangeText={setPassword}
               secureTextEntry
             />
-            {/* Container for progress bar followed by strength label */}
+            {/* Container for password strength slider */}
             <View style={{ width: "95%" }}>
               <View
                 style={{
@@ -193,14 +199,19 @@ const RegisterPage: React.FC = () => {
                   style={{
                     width: animatedWidth,
                     height: "100%",
-                    backgroundColor: sliderColor,
+                    backgroundColor: password.length === 0 ? "#ccc" : animatedStrengthColor,
                     borderRadius: 3,
                   }}
                 />
               </View>
-              <Text style={[authStyles.passwordStrength, { color: sliderColor, marginLeft: 10 }]}>
-                {passwordStrength}
-              </Text>
+              <Animated.Text
+                style={[
+                  authStyles.passwordStrength,
+                  { marginLeft: 10, color: password.length === 0 ? "#ccc" : animatedStrengthColor },
+                ]}
+              >
+                {password.length === 0 ? "Please enter a password" : passwordStrength}
+              </Animated.Text>
             </View>
             <TextInput
               style={authStyles.input}
