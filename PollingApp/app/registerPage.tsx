@@ -52,8 +52,11 @@ const RegisterPage: React.FC = () => {
   const router = useRouter();
   const { setUser } = useAuth();
 
-  // Keep the Animated.Value
+  // Keep the Animated.Value for password strength
   const animatedStrength = useRef(new Animated.Value(0)).current;
+  
+  // New Animated.Value for password match slider
+  const matchAnim = useRef(new Animated.Value(0)).current;
 
   // 1) Always run this (even if image isn't loaded yet)
   useEffect(() => {
@@ -69,6 +72,17 @@ const RegisterPage: React.FC = () => {
       useNativeDriver: false,
     }).start();
   }, [password]);
+
+  // New useEffect for password match slider
+  useEffect(() => {
+    const toValue = confirmPassword.length > 0 && password === confirmPassword ? 100 : 0;
+    Animated.timing(matchAnim, {
+      toValue,
+      duration: 300,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [password, confirmPassword]);
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
@@ -138,6 +152,12 @@ const RegisterPage: React.FC = () => {
     outputRange: ["0%", "100%"],
   });
 
+  // In render, compute animated width for match slider:
+  const animatedMatchWidth = matchAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+  });
+
   return (
     <ImageBackground source={bgImage} style={authStyles.bg}>
       <View style={authStyles.container}>
@@ -159,7 +179,7 @@ const RegisterPage: React.FC = () => {
               secureTextEntry
             />
             {/* Container for progress bar followed by strength label */}
-            <View style={{ width: "100%" }}>
+            <View style={{ width: "95%" }}>
               <View
                 style={{
                   width: "100%",
@@ -189,6 +209,48 @@ const RegisterPage: React.FC = () => {
               onChangeText={setConfirmPassword}
               secureTextEntry
             />
+            {(
+              // Compute match status variables
+              () => {
+                const passwordMatchText =
+                  confirmPassword.length === 0
+                    ? "Please confirm password"
+                    : password === confirmPassword
+                    ? "Passwords match"
+                    : "Passwords do not match";
+                const passwordMatchColor =
+                  confirmPassword.length === 0
+                    ? "#ccc"
+                    : password === confirmPassword
+                    ? "green"
+                    : "red";
+                return (
+                  <View style={{ width: "95%" }}>
+                    <View
+                      style={{
+                        width: "100%",
+                        height: 6,
+                        backgroundColor: "#ccc",
+                        borderRadius: 3,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Animated.View
+                        style={{
+                          width: animatedMatchWidth,
+                          height: "100%",
+                          backgroundColor: passwordMatchColor,
+                          borderRadius: 3,
+                        }}
+                      />
+                    </View>
+                    <Text style={[authStyles.passwordStrength, { color: passwordMatchColor, marginLeft: 10 }]}>
+                      {passwordMatchText}
+                    </Text>
+                  </View>
+                );
+              }
+            )()}
             <TouchableOpacity style={authStyles.button} onPress={handleRegister}>
               <Text style={authStyles.buttonText}>Register</Text>
             </TouchableOpacity>

@@ -81,7 +81,7 @@ export default StyleSheet.create({
     color: "#007AFF", // default color; will be overridden inline
   },
   strengthSlider: {
-    width: "100%",
+    width: "95%",
     height: 40,
     marginVertical: 10,
   },
