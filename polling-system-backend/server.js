@@ -12,6 +12,7 @@ const { registerAndSendEmail, verifyEmail } = require("./register");
 const { loginUser } = require("./login");
 const verificationRouter = require("./verify");
 const { getAccountDetails } = require("./accountDetailGetter");
+const { updateUserClasses } = require("./classHelper");
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +36,8 @@ app.use(express.json());
 // Mount additional routers
 app.use("/api", router);
 app.use("/api", verificationRouter);
+// Remove separate mounts and use the combined profilePicture route
+app.use("/api", require("./profilePicture"));
 
 app.post("/api/register", async (req, res) => {
   const { email, password, role } = req.body;
@@ -79,6 +82,20 @@ app.post("/api/login", async (req, res) => {
   } catch (error) {
     console.error("[ERROR] Login error for email:", email, error);
     res.status(400).json({ message: error.message || "Login failed" });
+  }
+});
+
+app.post("/api/saveclasses", async (req, res) => {
+  const { user_id, classes } = req.body;
+  if (!user_id || !classes || !Array.isArray(classes)) {
+    return res.status(400).json({ message: "user_id and an array of classes are required." });
+  }
+  try {
+    await updateUserClasses(user_id, classes);
+    res.status(200).json({ message: "Classes saved successfully." });
+  } catch (error) {
+    console.error("[ERROR] Saving classes:", error);
+    res.status(500).json({ message: error.message || "Failed to save classes." });
   }
 });
 

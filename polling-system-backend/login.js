@@ -14,8 +14,14 @@ const loginUser = async (email, password) => {
   await connectionPromise; // Ensure the database connection is ready
   const connection = await getConnection(); // Await the connection
   
-  // Query the database for a user with the given email
-  const query = "SELECT login_id, user_id, email, password, role, is_verified, verification_key, created_at FROM logins WHERE email = ?";
+  // Updated query: join logins with users to get classes from users table
+  const query = `
+    SELECT l.login_id, l.user_id, l.email, l.password, l.role, l.is_verified,
+           COALESCE(u.classes, '') AS classes, l.verification_key, l.created_at
+    FROM logins l
+    LEFT JOIN users u ON l.user_id = u.user_id
+    WHERE l.email = ?
+  `;
   const [rows] = await connection.query(query, [email]);
   
   if (rows.length === 0) {
@@ -23,6 +29,7 @@ const loginUser = async (email, password) => {
   }
   
   const user = rows[0];
+  console.log("[DEBUG] Retrieved user classes:", user.classes); // Debug log
   
   // Validate password: use bcrypt only if the stored password is hashed
   let passwordMatch;

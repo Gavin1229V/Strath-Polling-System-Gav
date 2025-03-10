@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SERVER_IP } from "./config";
 
 interface AuthUser {
@@ -11,6 +12,8 @@ interface AuthUser {
   verification_key?: string | null;
   created_at: string;
   token: string;
+  profile_picture?: string; // Added optional profile_picture property
+  classes?: string; // Added property to store user classes
 }
 
 interface AuthContextType {
@@ -24,26 +27,40 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUserState] = useState<AuthUser | null>(null);
 
-  // Removed auto-fetch of account details to rely on login to set user.
-  // Original code is commented out:
-  /*
+  // Update setUser: store user without profile_picture, and store profile_picture separately
+  const setUser = async (userData: AuthUser | null) => {
+    setUserState(userData);
+    if (userData) {
+      const { profile_picture, ...userToStore } = userData;
+      await AsyncStorage.setItem("user", JSON.stringify(userToStore));
+      if (profile_picture) {
+        await AsyncStorage.setItem("profile_picture", profile_picture);
+      } else {
+        await AsyncStorage.removeItem("profile_picture");
+      }
+    } else {
+      await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem("profile_picture");
+    }
+  };
+
+  // On provider mount, load the stored user and the separate profile picture
   useEffect(() => {
-    const fetchAccountDetails = async () => {
-      try {
-        const response = await fetch(`${SERVER_IP}/api/accountDetails`);
-        const data = await response.json();
-        if (Array.isArray(data) && data.length) {
-          setUser(data[0]);
+    const loadUser = async () => {
+      const storedUser = await AsyncStorage.getItem("user");
+      const storedPic = await AsyncStorage.getItem("profile_picture");
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        if (storedPic) {
+          parsedUser.profile_picture = storedPic;
         }
-      } catch (error) {
-        console.error("Error fetching account details:", error);
+        setUserState(parsedUser);
       }
     };
-    fetchAccountDetails();
+    loadUser();
   }, []);
-  */
 
   return (
     <AuthContext.Provider value={{ user, setUser }}>
@@ -80,4 +97,10 @@ export const useLastName = () => {
     }
   }
   return "";
+};
+
+// New hook to extract user classes as an array for display
+export const useUserClasses = () => {
+  const { user } = useAuth();
+  return user?.classes ? user.classes.split(",") : [];
 };

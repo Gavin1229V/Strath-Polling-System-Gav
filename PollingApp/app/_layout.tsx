@@ -1,11 +1,20 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Stack, usePathname, useRouter } from "expo-router";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { AuthProvider, useAuth } from "./userDetails";
 import NavBar from "../components/NavBar"; // updated import path
 
 function InnerLayout() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useAuth();
+
+  // Redirect to home if logged in and on index route
+  useEffect(() => {
+    if (user && (pathname === "/" || pathname === "/index")) {
+      router.replace("/home");
+    }
+  }, [user, pathname]);
 
   const hideNavBarRoutes = ["/", "/login", "/registerPage"];
   const shouldHideNavBar = hideNavBarRoutes.includes(pathname);
@@ -39,8 +48,15 @@ function InnerLayout() {
             name="home"
             options={{
             title: "Home",
-            headerBackVisible: true,
+            headerBackVisible: false,
             headerLeft: () => null,
+            }}
+          />
+          <Stack.Screen
+            name="classChooser"
+            options={{
+            title: "Choose Your Classes Here",
+            headerBackVisible: true,
             }}
           />
           <Stack.Screen
@@ -57,6 +73,13 @@ function InnerLayout() {
               title: "Poll Viewer",
               headerBackVisible: false,
               headerLeft: () => null,
+            }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{
+              title: "Settings",
+              headerBackVisible: true,
             }}
           />
         </Stack>

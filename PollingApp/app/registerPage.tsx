@@ -11,8 +11,7 @@ import {
   Animated,    // 1) Import Animated
   Easing,
 } from "react-native";
-// Remove Slider import
-// import Slider from "@react-native-community/slider";
+import * as Updates from "expo-updates"; // Import expo-updates
 
 import { useRouter } from "expo-router";
 import { SERVER_IP } from "./config";
@@ -110,18 +109,8 @@ const RegisterPage: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         const token = data.token;
-        setUser({
-          token,
-          email,
-          password,
-          role: data.role,
-          login_id: data.login_id,
-          user_id: data.user_id,
-          is_verified: data.is_verified,
-          created_at: data.created_at,
-        });
         Alert.alert("Success", "Registered successfully.");
-        router.replace("/home");
+        router.replace("/"); // Navigate back to the index page
       } else {
         const errorData = await response.json();
         Alert.alert("Error", errorData.message || "Registration failed.");

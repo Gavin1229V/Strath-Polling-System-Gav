@@ -4,6 +4,11 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 
+// New helper function to generate an 8-digit unique user_id.
+function generateUniqueUserId() {
+  return Math.floor(10000000 + Math.random() * 90000000);
+}
+
 function createToken(loginId, email, verificationKey) {
   if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET environment variable must be set.");
@@ -77,6 +82,9 @@ const registerAndSendEmail = async (email, password, role = 1) => {
 
   console.log("[DEBUG] Registering user with email:", email, "and role:", role);
 
+  // Generate a unique 8-digit user_id.
+  const userId = generateUniqueUserId();
+
   // Generate a unique verification key for this user.
   const verificationKey = crypto.randomBytes(16).toString("hex");
 
@@ -84,11 +92,16 @@ const registerAndSendEmail = async (email, password, role = 1) => {
     await connection.beginTransaction();
     console.log("[DEBUG] Beginning transaction.");
 
-    // Insert the new user with the unique verification key.
+    // Insert the new user with the unique user_id and verification key.
     const query = `INSERT INTO logins (user_id, email, password, role, is_verified, verification_key) VALUES (?, ?, ?, ?, 0, ?)`;
-    console.log("[DEBUG] Executing SQL query:", query, "with values:", [0, email, password, role, verificationKey]);
-    const [result] = await connection.query(query, [0, email, password, role, verificationKey]);
+    console.log("[DEBUG] Executing SQL query:", query, "with values:", [userId, email, password, role, verificationKey]);
+    const [result] = await connection.query(query, [userId, email, password, role, verificationKey]);
     const loginId = result.insertId;
+
+    // NEW: Insert initial data into users table
+    const usersQuery = `INSERT INTO users (user_id, email) VALUES (?, ?)`;
+    await connection.query(usersQuery, [userId, email]);
+
     console.log("[DEBUG] User registered with login ID:", loginId);
 
     // Attempt to send the verification email with the unique verification key.
