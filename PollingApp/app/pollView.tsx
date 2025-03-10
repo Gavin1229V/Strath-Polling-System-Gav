@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, FlatList, Button, Dimensions, StyleSheet } from "react-native";
+import { View, Text, FlatList, Button, Dimensions, StyleSheet, Image } from "react-native";
 import { io } from "socket.io-client";
 import { PieChart } from "react-native-chart-kit";
 import styles from "../styles/styles";
@@ -16,6 +16,8 @@ interface Poll {
   id: number;
   question: string;
   created_by: string;
+  created_by_id?: number;
+  profile_picture?: string;
   created_at: string;
   options: PollOption[];
 }
@@ -53,6 +55,14 @@ const PollView = () => {
 
     // Render Pie Chart with Smooth Animations
     const renderPieChart = (poll: Poll) => {
+        // Compute full profile picture URL similar to Home logic
+        let profilePicUrl = null;
+        if (poll.profile_picture && typeof poll.profile_picture === "string") {
+             profilePicUrl = (poll.profile_picture.startsWith("data:") || poll.profile_picture.startsWith("http"))
+                ? poll.profile_picture
+                : `${SERVER_IP}/${poll.profile_picture}`;
+        }
+
         const data = poll.options.map((option, index) => ({
             name: option.text,
             votes: option.votes,
@@ -63,9 +73,17 @@ const PollView = () => {
 
         return (
             <View style={{ marginVertical: 20 }}>
-                <Text style={styles.questionText}>{poll.question}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Text style={styles.questionText}>{poll.question}</Text>
+                    {profilePicUrl ? (
+                      <Image 
+                        source={{ uri: profilePicUrl }} 
+                        style={{ width: 60, height: 60, borderRadius: 30 }} 
+                      />
+                    ) : null}
+                </View>
                 <Text style={{ fontSize: 12, color: "#000" }}>
-                  {`By: ${poll.created_by} - ${new Date(poll.created_at).toLocaleString()}`}
+                  {`${poll.created_by} - ${new Date(poll.created_at).toLocaleString()}`}
                 </Text>
                 <PieChart
                     data={data}

@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import styles from "../styles/styles";
 import { fetchPolls } from "./global";
 import { SERVER_IP } from "./config";
-import { useFirstName, useLastName } from "./userDetails";
+import { useFirstName, useLastName, useAuth } from "./userDetails"; // updated: import useAuth
 
 const PollScreen = () => {
   interface PollOption {
@@ -25,6 +25,8 @@ const PollScreen = () => {
   const [newPoll, setNewPoll] = useState({ question: "", options: ["", ""] });
   const [voteStatus, setVoteStatus] = useState("");
 
+  const { user } = useAuth(); // Get auth details including token
+
   // Get poll author from auth context
   const firstName = useFirstName();
   const lastName = useLastName();
@@ -45,13 +47,23 @@ const PollScreen = () => {
     try {
       const response = await fetch(`${SERVER_IP}/api/polls`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: newPoll.question, options: filteredOptions, created_by: author }),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": user ? `Bearer ${user.token}` : "",
+        },
+        body: JSON.stringify({
+          question: newPoll.question,
+          options: filteredOptions,
+          created_by: `${firstName} ${lastName}`.trim(), // same as author
+          created_by_id: user?.user_id,
+          class: user?.classes || "",
+          global: false,
+        }),
       });
       if (!response.ok) {
         throw new Error(`Error creating poll: ${response.statusText}`);
       }
-      setNewPoll({ question: "", options: ["", ""] }); // Reset to two blank options
+      setNewPoll({ question: "", options: ["", ""] });
       fetchPolls(setPolls);
     } catch (err) {
       console.error("Error creating poll:", err);
@@ -97,12 +109,16 @@ const PollScreen = () => {
             )}
           </View>
         ))}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setNewPoll({ ...newPoll, options: [...newPoll.options, ""] })}
-        >
-          <Text style={styles.buttonText}>Add Another Option</Text>
-        </TouchableOpacity>
+        {newPoll.options.length < 5 && (
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() =>
+              setNewPoll({ ...newPoll, options: [...newPoll.options, ""] })
+            }
+          >
+            <Text style={styles.buttonText}>Add Another Option</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.button} onPress={createPoll}>
           <Text style={styles.buttonText}>Create Poll</Text>
         </TouchableOpacity>

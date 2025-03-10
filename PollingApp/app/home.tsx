@@ -1,3 +1,8 @@
+// Add Buffer polyfill for Expo if not already present:
+if (typeof global.Buffer === "undefined") {
+  global.Buffer = require("buffer").Buffer;
+}
+
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useAuth, useFirstName, useLastName } from "./userDetails";
@@ -5,32 +10,54 @@ import { useRouter } from "expo-router";
 import { SERVER_IP } from "./config";
 import * as ImagePicker from "expo-image-picker"; // New import
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Buffer } from "buffer"; // NEW: import Buffer to convert buffers
+import { useFocusEffect } from '@react-navigation/native'; // NEW import
+
+const convertToBase64Uri = (pic: any): string => {
+  if (!pic) return "";
+  if (typeof pic === "string") {
+    return pic.startsWith("data:") ? pic : "data:image/jpeg;base64," + pic;
+  }
+  if (pic.data) {
+    let byteArray: Uint8Array;
+    if (pic.data instanceof Uint8Array) {
+      byteArray = pic.data;
+    } else if (Array.isArray(pic.data)) {
+      byteArray = new Uint8Array(pic.data);
+    } else {
+      try {
+        byteArray = new Uint8Array(Object.values(pic.data));
+      } catch (e) {
+        console.error("Invalid pic.data format:", e);
+        return "";
+      }
+    }
+    const base64String = Buffer.from(byteArray).toString("base64");
+    return "data:image/jpeg;base64," + base64String;
+  }
+  return "";
+};
 
 const HomeScreen = () => {
   const { user, setUser } = useAuth();
   const router = useRouter();
   const [dbClasses, setDbClasses] = useState<string>("");
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const firstName = useFirstName();
   const lastName = useLastName();
-
   // Parse comma-separated classes into an array
   const classesList = dbClasses.split(",").map(cls => cls.trim()).filter(Boolean);
 
   useEffect(() => {
-    if (user && !profilePicture) {
-      // Attempt to load stored profile picture from AsyncStorage
-      AsyncStorage.getItem("profile_picture")
-        .then(storedPic => {
-          if (storedPic) {
-            setProfilePicture(storedPic);
-            setUser({ ...user, profile_picture: storedPic });
-          }
-        })
-        .catch(err => console.error("Error loading profile picture from storage:", err));
+    // Use the stored user profile picture if present.
+    if (user && user.profile_picture && !profilePicture) {
+      setProfilePicture(user.profile_picture);
+    }
 
-      // Existing fetch logic to get account details & picture from backend
+    if (user && !profilePicture) {
+      // Fetch account details and get profile picture directly from table
       fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
         .then(res => res.json())
         .then(details => {
@@ -38,43 +65,65 @@ const HomeScreen = () => {
             const account = details[0];
             setDbClasses(account.classes || "");
             if (account.profile_picture && !user.profile_picture) {
-              setProfilePicture(account.profile_picture);
-              setUser({ ...user, profile_picture: account.profile_picture });
+              let pic = account.profile_picture;
+              pic = convertToBase64Uri(pic);
+              if (pic) {
+                setProfilePicture(pic);
+                setUser({ ...user, profile_picture: pic });
+              }
             }
           }
         })
         .catch(err => {
           console.error("Error fetching account details:", err);
         });
-  
+
       // Also fetch profile picture separately if missing
       if (!user.profile_picture) {
         fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`)
-          .then(res => res.json())
-          .then(data => {
+          .then((res) => res.json())
+          .then((data) => {
             console.log("Fetched profilePicture data:", data);
             if (data && data.profile_picture && !user.profile_picture) {
               let pic = data.profile_picture;
-              if (!pic.startsWith("data:")) {
-                pic = "data:image/jpeg;base64," + pic;
+              pic = convertToBase64Uri(pic);
+              if (pic) {
+                setProfilePicture(pic);
+                setUser({ ...user, profile_picture: pic });
               }
-              setProfilePicture(pic);
-              setUser({ ...user, profile_picture: pic });
             }
           })
-          .catch(err => {
+          .catch((err) => {
             console.error("Error fetching profile picture:", err);
           });
       }
     }
   }, [user, profilePicture]);
 
-  useEffect(() => {
-    if (user) {
-      // Sync local state with updated user context
-      setProfilePicture(user.profile_picture || null);
-    }
-  }, [user]);
+  // Add useFocusEffect hook to refresh profile picture on screen focus:
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`)
+          .then((res) => res.json())
+          .then((data) => {
+            console.log("Focus fetched profilePicture data:", data);
+            if (data && data.profile_picture) {
+              let pic = data.profile_picture;
+              pic = convertToBase64Uri(pic);
+              if (pic) {
+                setProfilePicture(pic);
+                setUser({ ...user, profile_picture: pic });
+              }
+            }
+          })
+          .catch((err) => {
+            console.error("Error fetching profile picture on focus:", err);
+          });
+      }
+      return () => {};
+    }, [user])
+  );
 
   // New function to pick image with blob conversion
   const pickImage = async () => {
@@ -104,7 +153,12 @@ const HomeScreen = () => {
         .then((data) => {
           console.log("Upload response:", data); // Debug log
           if (data.success) {
-            setProfilePicture(data.profile_picture);
+            let pic = data.profile_picture;
+            pic = convertToBase64Uri(pic);
+            if (pic) {
+              setProfilePicture(pic);
+              setUser({ ...user, profile_picture: pic });
+            }
           } else {
             console.error("Upload failed", data.error);
           }
@@ -125,8 +179,8 @@ const HomeScreen = () => {
             style={styles.profilePic} 
           />
         )}
-        {/* Conditionally show upload button only if profilePicture is not set */}
-        {!profilePicture && (
+        {/* Show upload button if no valid profile picture */}
+        {(!profilePicture || profilePicture.trim() === "") && (
           <TouchableOpacity
             style={styles.uploadProfilePic}
             onPress={pickImage}
@@ -140,9 +194,7 @@ const HomeScreen = () => {
         {user && (
           <TouchableOpacity
             style={styles.logoutButton}
-            onPress={() => {
-              router.push("/settings");
-            }}
+            onPress={() => router.push("/settings")}
           >
             <Text style={styles.logoutText}>Settings</Text>
           </TouchableOpacity>
@@ -164,7 +216,9 @@ const HomeScreen = () => {
         style={styles.classChooserButton} 
         onPress={() => router.push("/classChooser")}
       >
-        <Text style={styles.classChooserButtonText}>Choose Class</Text>
+        <Text style={styles.classChooserButtonText}>
+          {classesList.length > 0 ? "Change Classes" : "Choose Your Classes Here"}
+        </Text>
       </TouchableOpacity>
     </View>
   );

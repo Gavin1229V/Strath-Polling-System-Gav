@@ -29,14 +29,15 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUserState] = useState<AuthUser | null>(null);
 
-  // Update setUser: store user without profile_picture, and store profile_picture separately
+  // Update setUser to store profile_picture as a JSON string
   const setUser = async (userData: AuthUser | null) => {
     setUserState(userData);
     if (userData) {
       const { profile_picture, ...userToStore } = userData;
       await AsyncStorage.setItem("user", JSON.stringify(userToStore));
       if (profile_picture) {
-        await AsyncStorage.setItem("profile_picture", profile_picture);
+        // Store profile_picture as a string via JSON.stringify
+        await AsyncStorage.setItem("profile_picture", JSON.stringify(profile_picture));
       } else {
         await AsyncStorage.removeItem("profile_picture");
       }
@@ -104,3 +105,5 @@ export const useUserClasses = () => {
   const { user } = useAuth();
   return user?.classes ? user.classes.split(",") : [];
 };
+
+export default {}; // Added default export to suppress warning

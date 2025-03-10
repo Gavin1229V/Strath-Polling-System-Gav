@@ -25,6 +25,7 @@ const Settings = () => {
       if (data.success) {
         await AsyncStorage.removeItem("profile_picture");
         setUser({ ...user, profile_picture: undefined });
+        router.replace("/");  // added redirect to home
       } else {
         console.error("Error removing profile picture:", data.error);
       }
@@ -33,14 +34,13 @@ const Settings = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Settings</Text>
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.button} onPress={handleLogout}>
-        <Text style={styles.buttonText}>Logout</Text>
-      </TouchableOpacity>
       {/* Remove Profile Picture Button */}
       <TouchableOpacity style={styles.button} onPress={handleRemoveProfilePic}>
         <Text style={styles.buttonText}>Remove Profile Picture</Text>
+      </TouchableOpacity>
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.button} onPress={handleLogout}>
+        <Text style={styles.buttonText}>Logout</Text>
       </TouchableOpacity>
     </View>
   );

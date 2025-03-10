@@ -17,7 +17,7 @@ router.get("/polls", async (req, res) => {
 });
 
 router.post("/polls", async (req, res) => {
-    const { question, options, created_by } = req.body; // updated to extract created_by
+    const { question, options, created_by, created_by_id, class: pollClass, global } = req.body; // extracted extra fields
 
     if (!question || !Array.isArray(options)) {
         console.error("Invalid input:", req.body);
@@ -25,7 +25,8 @@ router.post("/polls", async (req, res) => {
     }
 
     try {
-        const pollId = await createPoll(question, options, created_by); // pass created_by to createPoll
+        // Pass extra fields to createPoll
+        const pollId = await createPoll(question, options, created_by, created_by_id, pollClass, global);
         console.log("Poll created with ID:", pollId);
         res.status(201).json({ id: pollId });
     } catch (err) {
