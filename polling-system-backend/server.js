@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 
 const router = require("./pollRouter");
+const pollRouter = require("./pollRouter");
 const { getPolls, vote } = require("./polling");
 const { registerAndSendEmail, verifyEmail } = require("./register");
 const { loginUser } = require("./login");
@@ -38,6 +39,8 @@ app.use("/api", router);
 app.use("/api", verificationRouter);
 // Remove separate mounts and use the combined profilePicture route
 app.use("/api", require("./profilePicture"));
+// Mount the poll router to handle endpoints under /api/polls
+app.use("/api/polls", pollRouter);
 
 app.post("/api/register", async (req, res) => {
   const { email, password, role } = req.body;

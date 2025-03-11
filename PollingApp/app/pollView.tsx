@@ -1,46 +1,53 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, FlatList, Button, Dimensions, StyleSheet, Image } from "react-native";
+import { View, Text, FlatList, Button, Dimensions, StyleSheet, Image, ScrollView, TouchableOpacity } from "react-native";
 import { io } from "socket.io-client";
 import { PieChart } from "react-native-chart-kit";
 import styles from "../styles/styles";
 import { fetchPolls } from "./global";
 import { SERVER_IP } from "./config";
-
-// Define local types with the extra fields
-interface PollOption {
-  id: number;
-  text: string;
-  votes: number;
-}
-interface Poll {
-  id: number;
-  question: string;
-  created_by: string;
-  created_by_id?: number;
-  profile_picture?: string;
-  created_at: string;
-  options: PollOption[];
-}
+import { Poll } from "./global"; // Import shared Poll type
+import { useUserClasses } from "./userDetails";  // new import
+import { useRouter } from "expo-router"; // new import
 
 const PollView = () => {
 
     const [polls, setPolls] = useState<Poll[]>([]);
+    const [activeFilter, setActiveFilter] = useState<string>("All"); // new state for filter
     const socketRef = useRef(io(SERVER_IP));
     const screenWidth = Dimensions.get("window").width;
+    const userClasses = useUserClasses(); // get classes the user is registered in
+    const router = useRouter(); // new hook for navigation
 
     useEffect(() => {
         fetchPolls(setPolls);
 
         const socket = socketRef.current;
-        socket.on("pollsUpdated", (updatedPolls: Poll[]) => {
+        socket.on("pollsUpdated", (updatedPolls: any[]) => {
             console.log("Received pollsUpdated event with data:", updatedPolls);
-            setPolls(updatedPolls);
+            setPolls(prevPolls => 
+              updatedPolls.map(updated => {
+                  const old = prevPolls.find(p => p.id === updated.id);
+                  return {
+                      ...updated,
+                      pollClass: updated.pollClass ?? updated["class"] ?? (old ? old.pollClass : "")
+                  };
+              })
+            );
         });
 
         return () => {
             socket.disconnect();
         };
     }, []);
+
+    // New useEffect to update activeFilter only when userClasses are loaded
+    useEffect(() => {
+        if (userClasses.length > 0) { 
+            if (activeFilter !== "All" && !userClasses.includes(activeFilter)) {
+                setActiveFilter("All");
+            }
+        }
+    }, [userClasses]);
 
     // Cast a vote for an option
     const vote = (optionId: number) => {
@@ -55,6 +62,10 @@ const PollView = () => {
 
     // Render Pie Chart with Smooth Animations
     const renderPieChart = (poll: Poll) => {
+        console.log("Full poll object:", poll);
+        // Derive pollClass from the mapped property or fallback to the raw property
+        const pollClass = poll.pollClass || (poll as any)["class"] || "";
+        console.log("Poll Class:", pollClass);
         // Compute full profile picture URL similar to Home logic
         let profilePicUrl = null;
         if (poll.profile_picture && typeof poll.profile_picture === "string") {
@@ -73,8 +84,12 @@ const PollView = () => {
 
         return (
             <View style={{ marginVertical: 20 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <Text style={styles.questionText}>{poll.question}</Text>
+                {/* Update header view to display poll class using the same style as question */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <View>
+                        <Text style={styles.questionText}>{pollClass}</Text>
+                        <Text style={styles.questionText}>{poll.question}</Text>
+                    </View>
                     {profilePicUrl ? (
                       <Image 
                         source={{ uri: profilePicUrl }} 
@@ -123,13 +138,43 @@ const PollView = () => {
         );
     };
 
+    // Filter polls based on activeFilter
+    const filteredPolls = polls.filter(poll =>
+        activeFilter === "All"
+          ? userClasses.includes(poll.pollClass)
+          : poll.pollClass === activeFilter
+    );
+
     return (
         <FlatList
             style={styles.container}
-            data={polls}
+            data={filteredPolls}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderPoll}
             contentContainerStyle={{ paddingBottom: 80 }}
+            ListHeaderComponent={
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ padding: 10 }}>
+                    <Button
+                        title="All"
+                        onPress={() => setActiveFilter("All")}
+                        color={activeFilter === "All" ? "#007AFF" : "#8E8E93"}
+                    />
+                    {userClasses.map((cls) => (
+                      <View key={cls} style={{ marginLeft: 10 }}>
+                          <Button
+                              title={cls}
+                              onPress={() => setActiveFilter(cls)}
+                              color={activeFilter === cls ? "#007AFF" : "#8E8E93"}
+                          />
+                      </View>
+                    ))}
+                </ScrollView>
+            }
+            ListEmptyComponent={
+                <View style={{ flex: 1, justifyContent: "center", alignItems: "center", marginTop: 50 }}>
+                    <Text>You have no active polls</Text>
+                </View>
+            }
         />
     );
 };

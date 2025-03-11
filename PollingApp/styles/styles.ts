@@ -176,6 +176,15 @@ const styles = StyleSheet.create({
     backgroundColor: "red",
     borderRadius: 5,
   },
+  removeButtonAbsolute: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    backgroundColor: "red",
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
 });
 
 export default styles;

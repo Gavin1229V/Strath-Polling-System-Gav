@@ -1,7 +1,7 @@
 const { connectionPromise, getConnection } = require("./db"); // Import MySQL connection and connection promise
 
 // Create a new poll with author and created_at
-const createPoll = async (question, options, author) => {
+const createPoll = async (question, options, created_by, created_by_id, pollClass, global) => {
     await connectionPromise; // Ensure the connection is established
     const connection = await getConnection(); // Updated: await getConnection
 
@@ -15,12 +15,13 @@ const createPoll = async (question, options, author) => {
     const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
     console.log("[DEBUG] Creating poll with question:", question);
     console.log("[DEBUG] Options provided:", options);
-    console.log("[DEBUG] Poll author:", author);
+    console.log("[DEBUG] Poll author:", created_by);
+    console.log("[DEBUG] Created by ID:", created_by_id);
 
     try {
-        // Updated: Insert poll with question, created_by, and created_at
-        const query = `INSERT INTO polls (question, created_by, created_at) VALUES (?, ?, ?)`;
-        const [result] = await connection.query(query, [question, author, createdAt]);
+        // Updated: Insert poll with question, created_by, created_by_id, created_at, and class
+        const query = `INSERT INTO polls (question, created_by, created_by_id, created_at, class) VALUES (?, ?, ?, ?, ?)`;
+        const [result] = await connection.query(query, [question, created_by, created_by_id, createdAt, pollClass]);
         const pollId = result.insertId;
 
         console.log("[DEBUG] Poll created with ID:", pollId);
