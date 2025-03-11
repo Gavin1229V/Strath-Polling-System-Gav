@@ -42,49 +42,38 @@ const HomeScreen = () => {
   const { user, setUser } = useAuth();
   const router = useRouter();
   const [dbClasses, setDbClasses] = useState<string>("");
-  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(user?.profile_picture || null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [localClasses, setLocalClasses] = useState<string[]>([]);
 
   const firstName = useFirstName();
   const lastName = useLastName();
-  // Parse comma-separated classes into an array
-  const classesList = dbClasses.split(",").map(cls => cls.trim()).filter(Boolean);
 
   useEffect(() => {
-    // Use the stored user profile picture if present.
-    if (user && user.profile_picture && !profilePicture) {
-      setProfilePicture(user.profile_picture);
-    }
-
-    if (user && !profilePicture) {
-      // Fetch account details and get profile picture directly from table
-      fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
-        .then(res => res.json())
-        .then(details => {
-          if (details && details.length > 0) {
-            const account = details[0];
-            setDbClasses(account.classes || "");
-            if (account.profile_picture && !user.profile_picture) {
-              let pic = account.profile_picture;
-              pic = convertToBase64Uri(pic);
-              if (pic) {
-                setProfilePicture(pic);
-                setUser({ ...user, profile_picture: pic });
+    const loadUserProfile = async () => {
+      if (user) {
+        // Only fetch account details if classes are missing.
+        if (!user.classes) {
+          try {
+            const res = await fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`);
+            const details = await res.json();
+            if (details && details.length > 0) {
+              const account = details[0];
+              if (account.classes) {
+                setDbClasses(account.classes);
+                setUser({ ...user, classes: account.classes });
               }
             }
+          } catch (e) {
+            console.error("Error fetching account details:", e);
           }
-        })
-        .catch(err => {
-          console.error("Error fetching account details:", err);
-        });
-
-      // Also fetch profile picture separately if missing
-      if (!user.profile_picture) {
-        fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`)
-          .then((res) => res.json())
-          .then((data) => {
-            console.log("Fetched profilePicture data:", data);
-            if (data && data.profile_picture && !user.profile_picture) {
+        }
+        // Fetch profile picture only if missing.
+        if (!user.profile_picture) {
+          try {
+            const res2 = await fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`);
+            const data = await res2.json();
+            if (data && data.profile_picture) {
               let pic = data.profile_picture;
               pic = convertToBase64Uri(pic);
               if (pic) {
@@ -92,13 +81,14 @@ const HomeScreen = () => {
                 setUser({ ...user, profile_picture: pic });
               }
             }
-          })
-          .catch((err) => {
-            console.error("Error fetching profile picture:", err);
-          });
+          } catch (e) {
+            console.error("Error fetching profile picture:", e);
+          }
+        }
       }
-    }
-  }, [user, profilePicture]);
+    };
+    loadUserProfile();
+  }, [user]);
 
   // Add useFocusEffect hook to refresh profile picture on screen focus:
   useFocusEffect(
@@ -107,7 +97,7 @@ const HomeScreen = () => {
         fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`)
           .then((res) => res.json())
           .then((data) => {
-            console.log("Focus fetched profilePicture data:", data);
+            // Removed verbose log: "Focus fetched profilePicture data:" 
             if (data && data.profile_picture) {
               let pic = data.profile_picture;
               pic = convertToBase64Uri(pic);
@@ -125,69 +115,117 @@ const HomeScreen = () => {
     }, [user])
   );
 
+  // New useEffect to update profilePicture in local state if removed
+  useEffect(() => {
+    if (user && !user.profile_picture) {
+      setProfilePicture(null);
+    }
+  }, [user?.profile_picture]);
+
+  // Update localClasses whenever user.classes changes
+  useEffect(() => {
+    if (user?.classes) {
+      setLocalClasses(
+        user.classes.split(",").map(cls => cls.trim()).filter(Boolean)
+      );
+    } else {
+      setLocalClasses([]);
+    }
+  }, [user?.classes]);
+
+  // New useFocusEffect to refresh classes on home focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
+          .then(res => res.json())
+          .then(details => {
+            if (details && details.length > 0) {
+              const account = details[0];
+              if (account.classes) {
+                // Only update if the fetched classes differ from current user.classes
+                if (account.classes !== user.classes) {
+                  interface Account {
+                    classes: string;
+                  }
+
+                  const updatedClasses: string[] = (account as Account).classes
+                    .split(",")
+                    .map((cls: string): string => cls.trim())
+                    .filter(Boolean);
+                  setLocalClasses(updatedClasses);
+                  setUser({ ...user, classes: account.classes });
+                }
+              }
+            }
+          })
+          .catch(err => console.error("Error refreshing classes:", err));
+      }
+      return () => {};
+    }, [user])
+  );
+
   // New function to pick image with blob conversion
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-      // Remove base64 option
-    });
-    if (!result.canceled && user) {
-      console.log("Picked image:", result.assets[0]); // Debug log
-      // Convert image URI to a blob
-      const response = await fetch(result.assets[0].uri);
-      const blob = await response.blob();
-      // Prepare form data for upload
-      const formData = new FormData();
-      formData.append("user_id", user.user_id.toString());
-      formData.append("profile_picture", blob, "profile.jpg");
-      console.log("Uploading profile picture for user:", user.user_id); // Debug log
-      fetch(`${SERVER_IP}/api/uploadProfilePicture`, {
-        method: "POST",
-        body: formData,
-        // Do not set Content-Type header in React Native
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          console.log("Upload response:", data); // Debug log
-          if (data.success) {
-            let pic = data.profile_picture;
-            pic = convertToBase64Uri(pic);
-            if (pic) {
-              setProfilePicture(pic);
-              setUser({ ...user, profile_picture: pic });
-            }
-          } else {
-            console.error("Upload failed", data.error);
-          }
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.5,  // lowered quality for iOS
+      });
+      if (!result.canceled && user) {
+        const response = await fetch(result.assets[0].uri);
+        const blob = await response.blob();
+        const formData = new FormData();
+        formData.append("user_id", user.user_id.toString());
+        formData.append("profile_picture", blob, "profile.jpg");
+        fetch(`${SERVER_IP}/api/uploadProfilePicture`, {
+          method: "POST",
+          body: formData,
         })
-        .catch((err) => {
-          console.error("Error uploading profile picture:", err);
-        });
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              let pic = data.profile_picture;
+              pic = convertToBase64Uri(pic);
+              if (pic) {
+                setProfilePicture(pic);
+                setUser({ ...user, profile_picture: pic });
+              }
+            } else {
+              console.error("Upload failed", data.error);
+            }
+          })
+          .catch((err) => {
+            console.error("Error uploading profile picture:", err);
+          });
+      }
+    } catch (error) {
+      console.error("Error picking/uploading image:", error);
+      // Optionally alert the user
+      alert("There was an error uploading your profile picture. Please try again.");
     }
   };
 
   return (
     <View style={styles.homeContainer}>
       <View style={styles.profileContainer}>
-        {profilePicture && (
-          <Image 
-            resizeMode="cover" 
-            source={{ uri: profilePicture }} 
-            style={styles.profilePic} 
-          />
-        )}
-        {/* Show upload button if no valid profile picture */}
-        {(!profilePicture || profilePicture.trim() === "") && (
-          <TouchableOpacity
-            style={styles.uploadProfilePic}
-            onPress={pickImage}
-          >
+        {/* Replace separate conditional rendering with a single touchable wrapper */}
+        <TouchableOpacity
+          style={styles.uploadProfilePic}
+          onPress={pickImage}
+        >
+          {profilePicture ? (
+            <Image 
+              resizeMode="cover" 
+              source={{ uri: profilePicture }} 
+              style={styles.profilePic} 
+            />
+          ) : (
             <Text style={styles.uploadProfilePicText}>Click to upload</Text>
-          </TouchableOpacity>
-        )}
+          )}
+        </TouchableOpacity>
         <Text style={styles.profileName}>
           Welcome, {firstName} {lastName}
         </Text>
@@ -204,7 +242,7 @@ const HomeScreen = () => {
         <View style={styles.classesContainer}>
           <Text style={styles.classesTitle}>Your current classes are:</Text>
           <View style={styles.table}>
-            {classesList.map((cls, i) => (
+            {localClasses.map((cls, i) => (
               <View key={i} style={styles.tableRow}>
                 <Text style={styles.tableCell}>{cls}</Text>
               </View>
@@ -212,14 +250,6 @@ const HomeScreen = () => {
           </View>
         </View>
       )}
-      <TouchableOpacity 
-        style={styles.classChooserButton} 
-        onPress={() => router.push("/classChooser")}
-      >
-        <Text style={styles.classChooserButtonText}>
-          {classesList.length > 0 ? "Change Classes" : "Choose Your Classes Here"}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 };

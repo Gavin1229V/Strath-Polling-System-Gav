@@ -34,7 +34,11 @@ const Settings = () => {
 
   return (
     <View style={styles.container}>
-      {/* Remove Profile Picture Button */}
+      {/* Put Change Classes button at the top and use blue styling */}
+      <TouchableOpacity style={[styles.button, styles.changeClassesButton]} onPress={() => router.push("/classChooser")}>
+        <Text style={styles.buttonText}>Change Classes</Text>
+      </TouchableOpacity>
+      {/* Remove Profile Picture Button remains below */}
       <TouchableOpacity style={styles.button} onPress={handleRemoveProfilePic}>
         <Text style={styles.buttonText}>Remove Profile Picture</Text>
       </TouchableOpacity>
@@ -68,6 +72,9 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     width: "80%",
     alignItems: "center",
+  },
+  changeClassesButton: {
+    backgroundColor: "#007AFF", // blue instead of red
   },
   buttonText: {
     color: "#FFF",

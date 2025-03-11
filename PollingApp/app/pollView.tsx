@@ -6,24 +6,55 @@ import styles from "../styles/styles";
 import { fetchPolls } from "./global";
 import { SERVER_IP } from "./config";
 import { Poll } from "./global"; // Import shared Poll type
-import { useUserClasses } from "./userDetails";  // new import
+import { useUserClasses, useAuth } from "./userDetails";  // updated import to include useAuth
 import { useRouter } from "expo-router"; // new import
 
 const PollView = () => {
 
     const [polls, setPolls] = useState<Poll[]>([]);
     const [activeFilter, setActiveFilter] = useState<string>("All"); // new state for filter
+    const [loading, setLoading] = useState(true); // new loading state
     const socketRef = useRef(io(SERVER_IP));
     const screenWidth = Dimensions.get("window").width;
-    const userClasses = useUserClasses(); // get classes the user is registered in
+    const userClasses = useUserClasses(); // initial classes from user context
+    const { user, setUser } = useAuth();
+    // Local state for current classes (will be updated like Home)
+    const [currentClasses, setCurrentClasses] = useState<string[]>(userClasses);
+    // Normalize local current classes for consistent comparison
+    const normalizedCurrentClasses = currentClasses.map(cls => cls.trim().toLowerCase());
     const router = useRouter(); // new hook for navigation
 
+    // Fetch updated account details to update current classes (similar to Home)
     useEffect(() => {
-        fetchPolls(setPolls);
+        if (user) {
+            fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
+              .then(res => res.json())
+              .then(details => {
+                if (details && details.length > 0) {
+                    const account = details[0];
+                    const classesStr = account.classes || "";
+                    const classesArr: string[] = classesStr
+                      .split(",")
+                      .map((cls: string): string => cls.trim())
+                      .filter(Boolean);
+                    setCurrentClasses(classesArr);
+                }
+              })
+              .catch(err => {
+                console.error("Error fetching account details:", err);
+              });
+        }
+    }, [user]);
+
+    useEffect(() => {
+        const getPolls = async () => {
+            await fetchPolls(setPolls);
+            setLoading(false);
+        };
+        getPolls();
 
         const socket = socketRef.current;
         socket.on("pollsUpdated", (updatedPolls: any[]) => {
-            console.log("Received pollsUpdated event with data:", updatedPolls);
             setPolls(prevPolls => 
               updatedPolls.map(updated => {
                   const old = prevPolls.find(p => p.id === updated.id);
@@ -42,12 +73,25 @@ const PollView = () => {
 
     // New useEffect to update activeFilter only when userClasses are loaded
     useEffect(() => {
-        if (userClasses.length > 0) { 
-            if (activeFilter !== "All" && !userClasses.includes(activeFilter)) {
+        if (normalizedCurrentClasses.length > 0) { 
+            // reset activeFilter if current filter is not in normalized user classes
+            if (
+                activeFilter !== "All" &&
+                !normalizedCurrentClasses.includes(activeFilter.trim().toLowerCase())
+            ) {
                 setActiveFilter("All");
             }
         }
-    }, [userClasses]);
+    }, [normalizedCurrentClasses]);
+
+    // Display loading screen until loading is completed
+    if (loading) {
+        return (
+            <View style={styles.container}>
+                <Text>Loading...</Text>
+            </View>
+        );
+    }
 
     // Cast a vote for an option
     const vote = (optionId: number) => {
@@ -62,16 +106,24 @@ const PollView = () => {
 
     // Render Pie Chart with Smooth Animations
     const renderPieChart = (poll: Poll) => {
-        console.log("Full poll object:", poll);
-        // Derive pollClass from the mapped property or fallback to the raw property
         const pollClass = poll.pollClass || (poll as any)["class"] || "";
-        console.log("Poll Class:", pollClass);
         // Compute full profile picture URL similar to Home logic
         let profilePicUrl = null;
         if (poll.profile_picture && typeof poll.profile_picture === "string") {
-             profilePicUrl = (poll.profile_picture.startsWith("data:") || poll.profile_picture.startsWith("http"))
-                ? poll.profile_picture
-                : `${SERVER_IP}/${poll.profile_picture}`;
+             let pic = poll.profile_picture.trim();
+             // Remove extra quotes if present
+             if (pic.startsWith(`"`) && pic.endsWith(`"`)) {
+                 pic = pic.slice(1, -1);
+             }
+             if (
+               pic.startsWith("data:") ||
+               pic.startsWith("http://") ||
+               pic.startsWith("https://")
+             ) {
+                 profilePicUrl = pic;
+             } else {
+                 profilePicUrl = `${SERVER_IP}/${pic}`;
+             }
         }
 
         const data = poll.options.map((option, index) => ({
@@ -138,12 +190,13 @@ const PollView = () => {
         );
     };
 
-    // Filter polls based on activeFilter
-    const filteredPolls = polls.filter(poll =>
-        activeFilter === "All"
-          ? userClasses.includes(poll.pollClass)
-          : poll.pollClass === activeFilter
-    );
+    // Filter polls based on activeFilter using normalized strings
+    const filteredPolls = polls.filter(poll => {
+        const pollClassNormalized = (poll.pollClass || "").trim().toLowerCase();
+        return activeFilter === "All"
+          ? normalizedCurrentClasses.includes(pollClassNormalized)
+          : pollClassNormalized === activeFilter.trim().toLowerCase();
+    });
 
     return (
         <FlatList
@@ -159,7 +212,7 @@ const PollView = () => {
                         onPress={() => setActiveFilter("All")}
                         color={activeFilter === "All" ? "#007AFF" : "#8E8E93"}
                     />
-                    {userClasses.map((cls) => (
+                    {currentClasses.map((cls) => (
                       <View key={cls} style={{ marginLeft: 10 }}>
                           <Button
                               title={cls}

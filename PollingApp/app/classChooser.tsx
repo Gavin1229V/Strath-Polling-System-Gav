@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from "rea
 import { useAuth } from "./userDetails";
 import { useRouter } from "expo-router";
 import { SERVER_IP } from "./config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Hardcoded mapping for each year
 const yearClassMapping: Record<string, string[]> = {
@@ -119,10 +120,12 @@ const ClassChooser = () => {
       const result = await response.json();
       if (response.ok) {
         const classesString = selectedClasses.join(",");
-        // Update local user state so it persists on reload via AsyncStorage
+        // Clear previous classes from local storage then update state.
+        await AsyncStorage.removeItem("user");
         setUser({ ...user, classes: classesString });
-        Alert.alert("Success", result.message || "Classes saved successfully.");
-        router.replace("/home");
+        Alert.alert("Success", result.message || "Classes saved successfully.", [
+          { text: "OK", onPress: () => router.replace("/home") }
+        ]);
       } else {
         Alert.alert("Error", result.message || "Failed to save classes.");
       }
