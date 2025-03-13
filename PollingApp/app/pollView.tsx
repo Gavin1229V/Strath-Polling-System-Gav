@@ -32,7 +32,9 @@ const PollView = () => {
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   // Socket setup
-  const socketOptions = Platform.OS === "web" ? { transports: ["polling"] } : {};
+  const socketOptions = Platform.OS === "web" 
+    ? { transports: ["polling"], path: "/socket.io" } 
+    : {};
   const socketRef = useRef(io(SERVER_IP, socketOptions));
 
   const screenWidth = Dimensions.get("window").width;
@@ -130,7 +132,7 @@ const PollView = () => {
     );
     socketRef.current.emit("vote", optionId);
     // Remove spinner after short delay (socket will also update on server side)
-    setTimeout(() => setVoteLoading(false), 1000);
+    setTimeout(() => setVoteLoading(false), 2000);
   };
 
   // Pie chart colors with names

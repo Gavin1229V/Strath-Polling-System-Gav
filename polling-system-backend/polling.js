@@ -94,14 +94,17 @@ const vote = async (optionId) => {
     }
 
     try {
-        const query = `UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?`;
-
+        console.log(`[DEBUG] Attempting vote update for option: ${optionId}`);
+        // Updated: use COALESCE to ensure vote_count increments properly even if NULL
+        const query = `UPDATE poll_options SET vote_count = COALESCE(vote_count, 0) + 1 WHERE id = ?`;
         const [result] = await connection.query(query, [optionId]);
 
         if (result.affectedRows === 0) {
             throw new Error("No option found with the given ID.");
         }
+        console.log(`[INFO] Vote update succeeded for option: ${optionId}`);
     } catch (error) {
+        console.error(`[ERROR] Vote update failed for option: ${optionId}`, error);
         throw new Error("Failed to register vote.");
     }
 };
