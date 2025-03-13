@@ -1,19 +1,18 @@
-// Add Buffer polyfill for Expo if not already present:
 if (typeof global.Buffer === "undefined") {
   global.Buffer = require("buffer").Buffer;
 }
 
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, TouchableOpacity, Image, Dimensions, Platform, StatusBar, RefreshControl, ScrollView } from "react-native";
 import { useAuth, useFirstName, useLastName } from "./userDetails";
 import { useRouter } from "expo-router";
 import { SERVER_IP } from "./config";
-import * as ImagePicker from "expo-image-picker"; // New import
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Buffer } from "buffer"; // NEW: import Buffer to convert buffers
-import { useFocusEffect } from '@react-navigation/native'; // NEW import
+import * as ImagePicker from "expo-image-picker";
+import { Buffer } from "buffer";
+import { useFocusEffect } from '@react-navigation/native';
+import { SafeAreaView } from "react-native-safe-area-context";
+import { getSocket } from "./global";
 
-// Moved outside the component to prevent re-creation on every render.
 export const convertToBase64Uri = (pic: any): string => {
   if (!pic) return "";
   if (typeof pic === "string") {
@@ -46,102 +45,137 @@ const HomeScreen = () => {
   const [profilePicture, setProfilePicture] = useState<string | null>(user?.profile_picture || null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [localClasses, setLocalClasses] = useState<string[]>([]);
-
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  
   const firstName = useFirstName();
   const lastName = useLastName();
-
+  
+  // Get screen dimensions for responsive design
+  const { width } = Dimensions.get('window');
+  const profileSize = Math.min(100, width * 0.25); // Responsive profile size
+  
+  // Connect to the socket when the app loads
   useEffect(() => {
-    const loadUserProfile = async () => {
-      if (user) {
-        // Only fetch account details if classes are missing.
-        if (!user.classes) {
-          try {
-            const res = await fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`);
-            const details = await res.json();
-            if (details && details.length > 0) {
-              const account = details[0];
-              if (account.classes) {
-                setDbClasses(account.classes);
-                setUser({ ...user, classes: account.classes });
-              }
-            }
-          } catch (e) {
-            console.error("Error fetching account details:", e);
-          }
-        }
-        // Fetch profile picture only if missing.
-        if (!user.profile_picture) {
-          try {
-            const res2 = await fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`);
-            const data = await res2.json();
-            if (data && data.profile_picture) {
-              let pic = data.profile_picture;
-              pic = convertToBase64Uri(pic);
-              if (pic) {
-                setProfilePicture(pic);
-                setUser({ ...user, profile_picture: pic });
-              }
-            }
-          } catch (e) {
-            console.error("Error fetching profile picture:", e);
-          }
-        }
-      }
+    // Initialize the socket connection
+    const socket = getSocket();
+    
+    // Return a cleanup function
+    return () => {
+      // Socket will stay connected for other components
     };
-    loadUserProfile();
-  }, [user]);
+  }, []);
+  
+  // Memoized loadUserProfile function to prevent unnecessary recreations
+  const loadUserProfile = useCallback(async () => {
+    if (!user) return;
+    
+    setRefreshing(true);
+    try {
+      const fetchPromises = [];
+      
+      // Only fetch account details if classes are missing
+      if (!user.classes) {
+        fetchPromises.push(
+          fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
+            .then(res => res.json())
+            .then(details => {
+              if (details && details.length > 0) {
+                const account = details[0];
+                if (account.classes) {
+                  setDbClasses(account.classes);
+                  // Direct object update instead of functional update
+                  if (user) {
+                    setUser({ ...user, classes: account.classes });
+                  }
+                }
+              }
+            })
+        );
+      }
+      
+      // Fetch profile picture only if missing
+      if (!user.profile_picture) {
+        fetchPromises.push(
+          fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data && data.profile_picture) {
+                let pic = convertToBase64Uri(data.profile_picture);
+                if (pic && user) {
+                  setProfilePicture(pic);
+                  // Direct object update
+                  setUser({ ...user, profile_picture: pic });
+                }
+              }
+            })
+        );
+      }
+      
+      await Promise.all(fetchPromises);
+    } catch (e) {
+      console.error("Error loading user profile:", e);
+      setErrorMsg("Failed to load user data");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user, setUser]);
 
-  // Combined useFocusEffect for refreshing profile picture and classes
+  // Initial data loading
+  useEffect(() => {
+    loadUserProfile();
+  }, [loadUserProfile]);
+
+  // Combined useFocusEffect with optimized fetch
   useFocusEffect(
     React.useCallback(() => {
+      if (!user) return;
+      
       const fetchProfileAndClasses = async () => {
-        if (user) {
-          try {
-            const [picRes, accountRes] = await Promise.all([
-              fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`).then(res => res.json()),
-              fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`).then(res => res.json())
-            ]);
-            if (picRes && picRes.profile_picture) {
-              let pic = convertToBase64Uri(picRes.profile_picture);
-              if (pic) {
-                setProfilePicture(pic);
-                setUser({ ...user, profile_picture: pic });
-              }
+        try {
+          const [picRes, accountRes] = await Promise.all([
+            fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`).then(res => res.json()),
+            fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`).then(res => res.json())
+          ]);
+          
+          // Update profile picture if available
+          if (picRes && picRes.profile_picture && user) {
+            let pic = convertToBase64Uri(picRes.profile_picture);
+            if (pic) {
+              setProfilePicture(pic);
+              // Direct object update
+              setUser({ ...user, profile_picture: pic });
             }
-            if (accountRes && accountRes.length > 0) {
-              const account = accountRes[0];
-              if (account.classes && account.classes !== user.classes) {
-                interface AccountDetails {
-                  classes: string;
-                }
-
-                const updatedClasses: string[] = (account as AccountDetails).classes
-                  .split(",")
-                  .map((cls: string): string => cls.trim())
-                  .filter(Boolean);
-                setLocalClasses(updatedClasses);
-                setUser({ ...user, classes: account.classes });
-              }
-            }
-          } catch (err) {
-            console.error("Error in useFocusEffect:", err);
           }
+          
+          // Update classes if available and changed
+          if (accountRes && accountRes.length > 0) {
+            const account = accountRes[0];
+            if (account.classes && account.classes !== user.classes) {
+              const updatedClasses = account.classes
+                .split(",")
+                .map((cls: string) => cls.trim())
+                .filter(Boolean);
+              setLocalClasses(updatedClasses);
+              // Direct object update
+              setUser({ ...user, classes: account.classes });
+            }
+          }
+        } catch (err) {
+          console.error("Error in useFocusEffect:", err);
         }
       };
+      
       fetchProfileAndClasses();
       return () => {};
     }, [user])
   );
 
-  // New useEffect to update profilePicture in local state if removed
+  // Update local state when user data changes
   useEffect(() => {
     if (user && !user.profile_picture) {
       setProfilePicture(null);
     }
-  }, [user?.profile_picture]);
-
-  // Update localClasses whenever user.classes changes
-  useEffect(() => {
+    
     if (user?.classes) {
       setLocalClasses(
         user.classes.split(",").map(cls => cls.trim()).filter(Boolean)
@@ -149,184 +183,279 @@ const HomeScreen = () => {
     } else {
       setLocalClasses([]);
     }
-  }, [user?.classes]);
+  }, [user?.profile_picture, user?.classes]);
 
-  // New function to pick image with blob conversion
+  // Add navigation function to view polls filtered by class
+  const navigateToFilteredPolls = (classCode: string) => {
+    router.push({
+      pathname: "/pollView",
+      params: { activeFilter: classCode }
+    });
+  };
+
+  // Optimized image picker function
   const pickImage = async () => {
     try {
-      let result = await ImagePicker.launchImageLibraryAsync({
+      // Request permissions first on iOS
+      if (Platform.OS === 'ios') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Sorry, we need camera roll permissions to upload photos.');
+          return;
+        }
+      }
+      
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.5,  // lowered quality for iOS
+        aspect: [1, 1],
+        quality: Platform.OS === 'ios' ? 0.5 : 0.7,
       });
-      if (!result.canceled && user) {
-        const response = await fetch(result.assets[0].uri);
-        const blob = await response.blob();
-        const formData = new FormData();
-        formData.append("user_id", user.user_id.toString());
-        formData.append("profile_picture", blob, "profile.jpg");
-        fetch(`${SERVER_IP}/api/uploadProfilePicture`, {
-          method: "POST",
-          body: formData,
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.success) {
-              let pic = data.profile_picture;
-              pic = convertToBase64Uri(pic);
-              if (pic) {
-                setProfilePicture(pic);
-                setUser({ ...user, profile_picture: pic });
-              }
-            } else {
-              console.error("Upload failed", data.error);
+      
+      if (result.canceled || !user) return;
+      
+      const response = await fetch(result.assets[0].uri);
+      const blob = await response.blob();
+      
+      const formData = new FormData();
+      formData.append("user_id", user.user_id.toString());
+      formData.append("profile_picture", blob, "profile.jpg");
+      
+      fetch(`${SERVER_IP}/api/uploadProfilePicture`, {
+        method: "POST",
+        body: formData,
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && user) {
+            const pic = convertToBase64Uri(data.profile_picture);
+            if (pic) {
+              setProfilePicture(pic);
+              // Direct object update
+              setUser({ ...user, profile_picture: pic });
             }
-          })
-          .catch((err) => {
-            console.error("Error uploading profile picture:", err);
-          });
-      }
+          } else {
+            setErrorMsg("Failed to upload profile picture");
+          }
+        })
+        .catch(err => {
+          console.error("Error uploading profile picture:", err);
+          setErrorMsg("Error uploading profile picture");
+        });
     } catch (error) {
       console.error("Error picking/uploading image:", error);
-      // Optionally alert the user
-      alert("There was an error uploading your profile picture. Please try again.");
+      setErrorMsg("Error selecting or uploading image");
     }
   };
 
-  return (
-    <View style={styles.homeContainer}>
-      <View style={styles.profileContainer}>
-        {/* Replace separate conditional rendering with a single touchable wrapper */}
-        <TouchableOpacity
-          style={styles.uploadProfilePic}
-          onPress={pickImage}
-        >
-          {profilePicture ? (
-            <Image 
-              resizeMode="cover" 
-              source={{ uri: profilePicture }} 
-              style={styles.profilePic} 
-            />
-          ) : (
-            <Text style={styles.uploadProfilePicText}>Click to upload</Text>
-          )}
-        </TouchableOpacity>
-        <Text style={styles.profileName}>
-          Welcome, {firstName} {lastName}
+  const onRefresh = useCallback(() => {
+    loadUserProfile();
+  }, [loadUserProfile]);
+
+  // Enhanced profile image component with error handling
+  const renderProfileImage = () => {
+    if (!profilePicture) {
+      return (
+        <Text style={{
+          fontSize: Math.max(10, Math.min(12, width * 0.03)),
+          color: "#007AFF",
+          textAlign: "center",
+          padding: 5
+        }}>
+          Tap to upload
         </Text>
-        {user && (
+      );
+    }
+
+    return (
+      <Image 
+        resizeMode="cover" 
+        source={{ uri: profilePicture }} 
+        style={{
+          width: profileSize,
+          height: profileSize,
+          borderRadius: profileSize / 2
+        }}
+        accessibilityLabel="Profile picture"
+        // Add onError handler to fallback if image fails to load
+        onError={() => {
+          console.log("Error loading profile image");
+          setProfilePicture(null);
+        }}
+      />
+    );
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F5F5F5" }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
+      <ScrollView 
+        contentContainerStyle={{ 
+          flexGrow: 1, 
+          paddingBottom: 100, // Space for navbar
+          alignItems: "center", 
+        }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={{
+          width: '100%',
+          maxWidth: 500,
+          paddingHorizontal: width * 0.05,
+          paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 20 : 20,
+          alignItems: 'center'
+        }}>
           <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => router.push("/settings")}
+            style={{
+              width: profileSize,
+              height: profileSize,
+              borderRadius: profileSize / 2,
+              borderWidth: 2,
+              borderColor: "#007AFF",
+              justifyContent: "center",
+              alignItems: "center",
+              marginVertical: 10,
+              overflow: 'hidden',
+              backgroundColor: '#f0f0f0' // Light background for empty state
+            }}
+            onPress={pickImage}
+            accessibilityLabel="Upload profile picture"
+            accessibilityRole="button"
           >
-            <Text style={styles.logoutText}>Settings</Text>
+            {renderProfileImage()}
           </TouchableOpacity>
-        )}
-      </View>
-      {user && (
-        <View style={styles.classesContainer}>
-          <Text style={styles.classesTitle}>Your current classes are:</Text>
-          <View style={styles.table}>
-            {localClasses.map((cls, i) => (
-              <View key={i} style={styles.tableRow}>
-                <Text style={styles.tableCell}>{cls}</Text>
-              </View>
-            ))}
-          </View>
+          
+          <Text style={{
+            fontSize: Math.min(24, width * 0.06),
+            fontWeight: "600",
+            marginTop: 16,
+            textAlign: 'center'
+          }}>
+            Welcome, {firstName} {lastName}
+          </Text>
+          
+          {user && (
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#007AFF",
+                paddingVertical: 10,
+                paddingHorizontal: 20,
+                borderRadius: 8,
+                marginTop: 20,
+                minWidth: width * 0.3,
+                alignItems: 'center'
+              }}
+              onPress={() => router.push("/settings")}
+              accessibilityLabel="Settings"
+              accessibilityRole="button"
+            >
+              <Text style={{
+                color: "#FFF",
+                fontWeight: "600",
+                fontSize: Math.min(16, width * 0.04)
+              }}>
+                Settings
+              </Text>
+            </TouchableOpacity>
+          )}
+          
+          {user && (
+            <View style={{
+              marginTop: 30,
+              width: '100%',
+              alignItems: "center"
+            }}>
+              <Text style={{
+                fontSize: Math.min(18, width * 0.05),
+                fontWeight: "bold",
+                marginBottom: 10
+              }}>
+                Your current classes are:
+              </Text>
+              
+              {localClasses.length > 0 ? (
+                <View style={{
+                  width: '100%',
+                  backgroundColor: '#fff',
+                  borderRadius: 10,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                  elevation: 3,
+                  marginTop: 10
+                }}>
+                  {localClasses.map((cls, i) => (
+                    <View 
+                      key={i} 
+                      style={{
+                        paddingVertical: 12,
+                        paddingHorizontal: 15,
+                        borderBottomWidth: i < localClasses.length - 1 ? 1 : 0,
+                        borderBottomColor: "#eee",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                      }}
+                    >
+                      <Text 
+                        style={{
+                          fontSize: Math.min(16, width * 0.045),
+                          flex: 1
+                        }}
+                        accessibilityLabel={`Class ${cls}`}
+                      >
+                        {cls}
+                      </Text>
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: "#007AFF",
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          borderRadius: 6
+                        }}
+                        onPress={() => navigateToFilteredPolls(cls)}
+                        accessibilityLabel={`View polls for ${cls}`}
+                        accessibilityRole="button"
+                      >
+                        <Text style={{
+                          color: "#FFFFFF",
+                          fontSize: Math.min(14, width * 0.035),
+                          fontWeight: "500"
+                        }}>
+                          View Polls
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={{
+                  fontSize: 16,
+                  marginTop: 20,
+                  fontStyle: 'italic',
+                  color: '#666'
+                }}>
+                  No classes added yet
+                </Text>
+              )}
+            </View>
+          )}
+          
+          {errorMsg && (
+            <Text style={{
+              color: 'red',
+              marginTop: 20,
+              textAlign: 'center'
+            }}>
+              {errorMsg}
+            </Text>
+          )}
         </View>
-      )}
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  homeContainer: {
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-    paddingTop: 50,
-  },
-  profileContainer: {
-    alignItems: "center",
-  },
-  profilePic: {
-    width: 100,         // updated to match upload circle
-    height: 100,        // updated to match upload circle
-    borderRadius: 50,   // ensures it's a circle
-  },
-  profileName: {
-    fontSize: 24,
-    marginTop: 16,
-  },
-  classesContainer: {
-    marginTop: 20,
-    alignItems: "center",
-  },
-  classesTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  classesText: {
-    fontSize: 16,
-    marginTop: 8,
-  },
-  logoutButton: {
-    backgroundColor: "#FF3B30",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 5,
-    marginTop: 20,
-  },
-  logoutText: {
-    color: "#FFF",
-    fontWeight: "bold",
-  },
-  classChooserButton: {
-    width: "90%",
-    alignSelf: "center",
-    backgroundColor: "#007AFF",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 5,
-    marginTop: 20,
-  },
-  classChooserButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-    textAlign: "center",
-  },
-  // New styles for table display
-  table: {
-    marginTop: 10,
-    width: "100%",
-    paddingHorizontal: 20,
-  },
-  tableRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-    paddingVertical: 8,
-  },
-  tableCell: {
-    fontSize: 16,
-  },
-  // New styles for upload profile picture circle
-  uploadProfilePic: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: "#007AFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginVertical: 10,
-  },
-  uploadProfilePicText: {
-    fontSize: 12,
-    color: "#007AFF",
-    textAlign: "center",
-  },
-});
 
 export default HomeScreen;

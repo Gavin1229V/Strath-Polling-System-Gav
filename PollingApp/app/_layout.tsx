@@ -60,7 +60,7 @@ function InnerLayout() {
         }}
       />
       <Stack.Screen
-        name="pollCreator" // changed from "pollScreen" to existing route "pollCreator"
+        name="pollCreator"
         options={{
           title: "Poll Creation",
           headerBackVisible: false,

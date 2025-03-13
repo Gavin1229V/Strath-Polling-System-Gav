@@ -11,31 +11,35 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  useWindowDimensions,
+  RefreshControl,
 } from "react-native";
-import { io } from "socket.io-client";
-import { PieChart } from "react-native-chart-kit";
+import { PieChart } from 'react-native-chart-kit';
 import styles from "../styles/styles";
-import { fetchPolls } from "./global";
+import { fetchPolls, getSocket } from "./global";
 import { SERVER_IP } from "./config";
 import { Poll } from "./global";
 import { useUserClasses, useAuth } from "./userDetails";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 const PollView = () => {
+  const { activeFilter: initialFilter } = useLocalSearchParams<{ activeFilter?: string }>();
   const [polls, setPolls] = useState<Poll[]>([]);
-  const [activeFilter, setActiveFilter] = useState<string>("All");
+  const [activeFilter, setActiveFilter] = useState<string>(initialFilter || "All");
   const [loading, setLoading] = useState(true);
   const [voteLoading, setVoteLoading] = useState(false);
   const [infoPoll, setInfoPoll] = useState<Poll | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Get window dimensions for responsive layouts
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 500;
 
   // Slide animation for info overlay
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
-  // Socket setup
-  const socketOptions = Platform.OS === "web" 
-    ? { transports: ["polling"], path: "/socket.io" } 
-    : {};
-  const socketRef = useRef(io(SERVER_IP, socketOptions));
+  // Use the shared socket instance
+  const socketRef = useRef(getSocket());
 
   const screenWidth = Dimensions.get("window").width;
   const userClasses = useUserClasses();
@@ -47,11 +51,29 @@ const PollView = () => {
   );
   const router = useRouter();
 
-  // Fetch user classes
+  // Pull-to-refresh handler with error feedback
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchPolls(setPolls, true); // Force refresh
+    } catch (error) {
+      console.error("Error refreshing polls:", error);
+      // You could add a toast message here for user feedback
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Fetch user classes with better error handling
   useEffect(() => {
     if (user) {
       fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+          }
+          return res.json();
+        })
         .then((details) => {
           if (details && details.length > 0) {
             const account = details[0];
@@ -65,34 +87,75 @@ const PollView = () => {
         })
         .catch((err) => {
           console.error("Error fetching account details:", err);
+          // Fallback to existing classes if available
+          if (userClasses.length > 0) {
+            setCurrentClasses(userClasses);
+          }
         });
     }
-  }, [user]);
+  }, [user, userClasses]);
 
-  // Fetch polls
+  // Fetch polls and setup socket listeners with better error handling
   useEffect(() => {
+    let isMounted = true;
+    
     const getPolls = async () => {
-      await fetchPolls(setPolls);
-      setLoading(false);
+      try {
+        await fetchPolls(data => {
+          if (isMounted) setPolls(data);
+        });
+      } catch (error) {
+        console.error("Error fetching polls:", error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
+    
     getPolls();
 
     const socket = socketRef.current;
+    
+    // Setup socket event listeners with safer parsing
     socket.on("pollsUpdated", (updatedPolls: any[]) => {
-      setPolls((prevPolls) =>
-        updatedPolls.map((updated) => {
-          const old = prevPolls.find((p) => p.id === updated.id);
-          return {
-            ...updated,
-            pollClass:
-              updated.pollClass ?? updated["class"] ?? (old ? old.pollClass : ""),
-          };
-        })
-      );
+      if (!isMounted) return;
+      
+      try {
+        // Validate that updatedPolls is actually an array
+        if (!Array.isArray(updatedPolls)) {
+          console.error("Invalid polls data received:", updatedPolls);
+          return;
+        }
+        
+        setPolls((prevPolls) =>
+          updatedPolls.map((updated) => {
+            const old = prevPolls.find((p) => p.id === updated.id);
+            return {
+              ...updated,
+              pollClass:
+                updated.pollClass ?? updated["class"] ?? (old ? old.pollClass : ""),
+            };
+          })
+        );
+      } catch (error) {
+        console.error("Error processing updated polls:", error);
+      }
+    });
+    
+    // Handle socket errors
+    socket.on("error", (error) => {
+      console.error("Socket error:", error);
     });
 
+    // Make sure socket is connected
+    if (!socket.connected) {
+      socket.connect();
+    }
+
     return () => {
-      socket.disconnect();
+      isMounted = false;
+      // Remove event listeners but keep socket connected
+      socket.off("pollsUpdated");
+      socket.off("error");
     };
   }, []);
 
@@ -106,6 +169,13 @@ const PollView = () => {
       setActiveFilter("All");
     }
   }, [normalizedCurrentClasses, activeFilter]);
+
+  // Apply initial filter from params if provided
+  useEffect(() => {
+    if (initialFilter && normalizedCurrentClasses.includes(initialFilter.trim().toLowerCase())) {
+      setActiveFilter(initialFilter);
+    }
+  }, [initialFilter, normalizedCurrentClasses]);
 
   // Loading state
   if (loading) {
@@ -132,7 +202,7 @@ const PollView = () => {
     );
     socketRef.current.emit("vote", optionId);
     // Remove spinner after short delay (socket will also update on server side)
-    setTimeout(() => setVoteLoading(false), 2000);
+    setTimeout(() => setVoteLoading(false), 1000);
   };
 
   // Pie chart colors with names
@@ -194,6 +264,10 @@ const PollView = () => {
       legendFontSize: 12,
     }));
 
+    // Adjust chart size based on screen width
+    const chartWidth = Math.min(300, screenWidth - 60);
+    const chartHeight = Math.min(200, chartWidth * 0.8);
+
     return (
       <View style={{ marginVertical: 10, position: "relative" }}>
         {/* Move info button to top-right for a cleaner look */}
@@ -227,8 +301,8 @@ const PollView = () => {
         <View style={{ alignItems: "center", alignSelf: "center" }}>
           <PieChart
             data={data}
-            width={screenWidth - 80} // give a little horizontal margin
-            height={220}
+            width={chartWidth}
+            height={chartHeight}
             chartConfig={{
               backgroundGradientFrom: "transparent",
               backgroundGradientTo: "transparent",
@@ -252,15 +326,30 @@ const PollView = () => {
     return (
       <View style={styles.pollCard}>
         {renderPieChart(item)}
-        <View style={styles.voteRow}>
+        <View style={[
+          styles.voteOptionsContainer,
+          isMobile && { flexDirection: "column" }
+        ]}>
           {item.options.map((option, index) => (
-            <View key={option.id} style={styles.voteButtonContainer}>
+            <View 
+              key={option.id} 
+              style={[
+                styles.voteButtonContainer,
+                isMobile && { width: "100%", marginVertical: 4 }
+              ]}
+            >
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
                 <View style={[styles.swatchBox, { backgroundColor: chartColors[index % chartColors.length] }]} />
                 <Text style={styles.swatchText}>{option.text}</Text>
               </View>
               <Text style={{ marginBottom: 4 }}>({option.votes})</Text>
-              <Button title="VOTE" onPress={() => vote(option.id)} />
+              <TouchableOpacity 
+                style={styles.voteButton}
+                onPress={() => vote(option.id)}
+                disabled={voteLoading}
+              >
+                <Text style={styles.voteButtonText}>VOTE</Text>
+              </TouchableOpacity>
             </View>
           ))}
         </View>
@@ -291,43 +380,68 @@ const PollView = () => {
   return (
     <View style={styles.container}>
       <FlatList
-        style={styles.container}
+        style={styles.pollListContainer}
         data={filteredPolls}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderPoll}
         contentContainerStyle={{ paddingBottom: 80 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#007AFF"]}
+            tintColor={"#007AFF"}
+          />
+        }
         ListHeaderComponent={
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ padding: 10 }}
+            style={styles.filterScrollView}
           >
-            <Button
-              title="All"
+            <TouchableOpacity
+              style={[
+                styles.filterButton, 
+                activeFilter === "All" && styles.activeFilterButton
+              ]}
               onPress={() => setActiveFilter("All")}
-              color={activeFilter === "All" ? "#007AFF" : "#8E8E93"}
-            />
+            >
+              <Text style={[
+                styles.filterButtonText,
+                activeFilter === "All" && styles.activeFilterText
+              ]}>All</Text>
+            </TouchableOpacity>
+            
             {currentClasses.map((cls) => (
-              <View key={cls} style={{ marginLeft: 10 }}>
-                <Button
-                  title={cls}
-                  onPress={() => setActiveFilter(cls)}
-                  color={activeFilter === cls ? "#007AFF" : "#8E8E93"}
-                />
-              </View>
+              <TouchableOpacity
+                key={cls}
+                style={[
+                  styles.filterButton,
+                  activeFilter === cls && styles.activeFilterButton
+                ]}
+                onPress={() => setActiveFilter(cls)}
+              >
+                <Text style={[
+                  styles.filterButtonText,
+                  activeFilter === cls && styles.activeFilterText
+                ]}>{cls}</Text>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text>You have no active polls</Text>
+            <Text>You have no active polls for this class</Text>
           </View>
         }
       />
 
       {voteLoading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <View style={styles.loadingIndicator}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>Submitting vote...</Text>
+          </View>
         </View>
       )}
 
@@ -342,6 +456,13 @@ const PollView = () => {
           ]}
         >
           <View style={styles.infoCard}>
+            <TouchableOpacity
+              onPress={closeInfoOverlay}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeButtonText}>×</Text>
+            </TouchableOpacity>
+            
             {/* Profile picture on the right inside the info card */}
             {infoPoll.profile_picture ? (
               <Image
@@ -356,25 +477,19 @@ const PollView = () => {
               />
             ) : null}
             <Text style={styles.infoTitle}>Poll Info</Text>
-            <Text style={{ marginBottom: 5 }}>
+            <Text style={styles.infoDetail}>
               Created on:{" "}
               {new Date(infoPoll.created_at.replace(" ", "T")).toLocaleString()}
             </Text>
-            <Text style={{ marginBottom: 5 }}>
+            <Text style={styles.infoDetail}>
               Created by: {infoPoll.created_by}
             </Text>
-            <Text style={{ marginBottom: 10 }}>
+            <Text style={styles.infoDetail}>
               Expires at:{" "}
               {infoPoll.expiry
                 ? new Date(infoPoll.expiry.replace(" ", "T")).toLocaleString()
                 : "N/A"}
             </Text>
-            <TouchableOpacity
-              onPress={closeInfoOverlay}
-              style={{ alignSelf: "flex-end" }}
-            >
-              <Text style={{ color: "#007AFF", fontWeight: "bold" }}>Close</Text>
-            </TouchableOpacity>
           </View>
         </Animated.View>
       )}

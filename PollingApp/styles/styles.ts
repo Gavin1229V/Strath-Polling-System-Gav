@@ -88,6 +88,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  pollListContainer: {
+    flex: 1,
+    backgroundColor: "#F5F5F5",
+  },
   classCode: {
     fontSize: 18,
     fontWeight: "600",
@@ -117,9 +121,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginVertical: 10,
   },
+  voteOptionsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginTop: 10,
+  },
   voteButtonContainer: {
     alignItems: "center",
     marginHorizontal: 10,
+    marginBottom: 8,
+    minWidth: 80,
+  },
+  voteButton: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 5,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  voteButtonText: {
+    color: "#fff",
+    fontWeight: "600",
   },
   emptyContainer: {
     flex: 1,
@@ -136,6 +160,38 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.7)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingIndicator: {
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#fff",
+    marginTop: 10,
+  },
+  filterScrollView: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+  },
+  filterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  activeFilterButton: {
+    backgroundColor: "#007AFF",
+  },
+  filterButtonText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  activeFilterText: {
+    color: "#fff",
+    fontWeight: "600",
   },
   infoOverlay: {
     position: "absolute",
@@ -165,6 +221,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
+  },
+  infoDetail: {
+    fontSize: 14,
+    marginBottom: 8,
+    color: "#333",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#f0f0f0",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  closeButtonText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+    lineHeight: 24,
   },
   option: {
     flexDirection: "row",

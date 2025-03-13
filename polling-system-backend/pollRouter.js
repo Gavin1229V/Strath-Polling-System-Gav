@@ -1,50 +1,35 @@
 const express = require("express");
 const router = express.Router();
-const { connectionPromise, getConnection } = require("./db"); // Import MySQL connection and connection promise
+const { getConnection } = require("./db"); // Import MySQL connection
 
+/**
+ * Creates a new poll in the database
+ */
 const createPoll = async (question, options, created_by, created_by_id, pollClass, expiry) => {
-    console.log("createPoll called with expiry:", expiry); // <--- Extra log added
-    await connectionPromise; // Ensure the connection is established
-    const connection = await getConnection(); // Updated: await getConnection
+    const connection = await getConnection();
 
     if (!question || !Array.isArray(options) || options.length < 2) {
         throw new Error("Invalid input: Poll must have a question and at least two options.");
     }
 
     const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    console.log("Created at:", createdAt); // <--- Log the createdAt timestamp
 
     try {
-        // Updated query uses STR_TO_DATE to convert expiry string into DATETIME
-        const query = `INSERT INTO polls (question, created_by, created_by_id, created_at, class, expiry) VALUES (?, ?, ?, ?, ?, STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'))`;
-        // Log before executing the query:
-        console.log("Executing insert query with expiry:", expiry);
-        const [result] = await connection.query(query, [question, created_by, created_by_id, createdAt, pollClass, expiry]);
+        // Insert the poll with proper datetime formatting for the expiry
+        const query = `INSERT INTO polls (question, created_by, created_by_id, created_at, class, expiry) 
+                       VALUES (?, ?, ?, ?, ?, STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'))`;
+        const [result] = await connection.query(query, [
+            question, created_by, created_by_id, createdAt, pollClass, expiry
+        ]);
         const pollId = result.insertId;
-        console.log("Poll inserted with id:", pollId);
 
-        // Detailed logging for expiry calculations
-        console.log(`Received expiry: ${expiry}`);
-        const expiryDate = new Date(expiry);
-        const now = new Date();
-        console.log("Computed expiryDate:", expiryDate, "Current time:", now);
-        const diffMs = expiryDate - now;
-        console.log("Difference in ms:", diffMs);
-        const seconds = Math.floor((diffMs/1000) % 60);
-        const minutes = Math.floor((diffMs/60000) % 60);
-        const hours = Math.floor((diffMs/(1000*60*60)) % 24);
-        const days = Math.floor(diffMs/(1000*60*60*24));
-        console.log(`Poll ${pollId} created. Time left: ${days}d ${hours}h ${minutes}m ${seconds}s`);
-
-        // Insert options into the database
-        const optionQueries = options.map((option, index) => {
+        // Insert all options for this poll
+        await Promise.all(options.map((option, index) => {
             return connection.query(
                 `INSERT INTO poll_options (poll_id, option_index, option_text) VALUES (?, ?, ?)`,
                 [pollId, index, option]
             );
-        });
-
-        await Promise.all(optionQueries);
+        }));
 
         return pollId;
     } catch (error) {
@@ -55,14 +40,13 @@ const createPoll = async (question, options, created_by, created_by_id, pollClas
 
 // Get all polls with their options
 const getPolls = async () => {
-    await connectionPromise; // Ensure the connection is established
     try {
         const connection = await getConnection();
-        // Removed debug log to prevent spam
-        // console.log("[DEBUG] Fetching all polls with their options");
 
+        // Join polls with poll_options and users tables to get all needed data
         const query = `
-            SELECT p.id, p.question, p.created_by, p.created_by_id, p.created_at, p.class AS pollClass, p.expiry,
+            SELECT p.id, p.question, p.created_by, p.created_by_id, p.created_at, 
+                   p.class AS pollClass, p.expiry,
                    po.id AS option_id, po.option_index, po.option_text, po.vote_count,
                    u.profile_picture
             FROM polls p 
@@ -73,7 +57,7 @@ const getPolls = async () => {
 
         const [rows] = await connection.query(query);
 
-        // Convert BLOB profile_picture to base64 URL if needed before grouping polls
+        // Group options by poll and convert profile picture to proper format
         const polls = rows.reduce((acc, row) => {
             if (!acc[row.id]) {
                 acc[row.id] = { 
@@ -81,8 +65,8 @@ const getPolls = async () => {
                     question: row.question, 
                     created_by: row.created_by,
                     created_by_id: row.created_by_id,
-                    pollClass: row.pollClass || "", // new field for poll class
-                    expiry: row.expiry, // <--- add expiry field here
+                    pollClass: row.pollClass || "",
+                    expiry: row.expiry,
                     profile_picture: row.profile_picture 
                       ? (Buffer.isBuffer(row.profile_picture)
                           ? "data:image/png;base64," + row.profile_picture.toString("base64")
@@ -103,39 +87,35 @@ const getPolls = async () => {
 
         return Object.values(polls);
     } catch (error) {
-        console.error("Failed to fetch polls on connection:", error);
+        console.error("Failed to fetch polls:", error);
         throw new Error("Failed to fetch polls.");
     }
 };
 
 // Vote for an option
 const vote = async (optionId) => {
-    await connectionPromise; // Ensure the connection is established
-    const connection = await getConnection(); // Updated: await getConnection
+    const connection = await getConnection();
 
     if (!optionId) {
         throw new Error("Invalid input: Option ID is required.");
     }
 
     try {
-        console.log(`[DEBUG] pollRouter: Attempting vote update for option: ${optionId}`);
-        // Updated: use COALESCE to ensure vote_count increments properly even if NULL
+        // Use COALESCE to handle NULL vote counts
         const query = `UPDATE poll_options SET vote_count = COALESCE(vote_count, 0) + 1 WHERE id = ?`;
-        const [result] = await getConnection().then(connection => connection.query(query, [optionId]));
+        const [result] = await connection.query(query, [optionId]);
 
         if (result.affectedRows === 0) {
             throw new Error("No option found with the given ID.");
         }
-        console.log(`[INFO] pollRouter: Vote update succeeded for option: ${optionId}`);
     } catch (error) {
-        console.error(`[ERROR] pollRouter: Vote update failed for option: ${optionId}`, error);
+        console.error(`Vote update failed for option: ${optionId}`, error);
         throw new Error("Failed to register vote.");
     }
 };
 
-// Define Express endpoints using the above functions
+// API Routes
 router.post("/", async (req, res) => {
-    // Destructure expiry from req.body along with pollClass
     const { question, options, created_by, created_by_id, class: pollClass, expiry } = req.body;
     try {
         const pollId = await createPoll(question, options, created_by, created_by_id, pollClass, expiry);
