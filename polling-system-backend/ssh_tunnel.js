@@ -19,9 +19,6 @@ const setupSSHTunnel = (localPort, remoteHost, remotePort) => {
 
         // Event listener for when the SSH connection is ready
         sshClient.on("ready", () => {
-            console.log("SSH connection established!");
-
-            // Set up port forwarding
             sshClient.forwardOut(
                 "127.0.0.1", // Localhost
                 localPort, // Local port to forward from
@@ -32,13 +29,8 @@ const setupSSHTunnel = (localPort, remoteHost, remotePort) => {
                         // Handle error in setting up SSH tunnel
                         console.error("Error setting up SSH tunnel:", err);
                         sshClient.end(); // End the SSH connection
-                        reject(err); // Reject the promise with the error
-                        return;
+                        return reject(err); // Reject the promise with the error
                     }
-                    // Log successful SSH tunnel setup
-                    console.log(
-                        `SSH Tunnel established: localhost:${localPort} -> ${remoteHost}:${remotePort}`
-                    );
                     resolve(stream); // Resolve the promise with the stream
                 }
             );
@@ -50,7 +42,7 @@ const setupSSHTunnel = (localPort, remoteHost, remotePort) => {
         });
 
         sshClient.on("close", () => {
-            console.log("SSH connection closed.");
+            // No additional logging
         });
 
         sshClient.connect(sshConfig);

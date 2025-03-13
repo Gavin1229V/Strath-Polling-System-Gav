@@ -1,4 +1,4 @@
-require("dotenv").config(); // Load environment variables
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
@@ -6,7 +6,7 @@ const socketIo = require("socket.io");
 const fs = require("fs");
 const path = require("path");
 
-const router = require("./pollRouter");
+// Use single router import if possible.
 const pollRouter = require("./pollRouter");
 const { getPolls, vote } = require("./polling");
 const { registerAndSendEmail, verifyEmail } = require("./register");
@@ -35,7 +35,7 @@ app.use(cors({
 app.use(express.json());
 
 // Mount additional routers
-app.use("/api", router);
+app.use("/api", pollRouter);
 app.use("/api", verificationRouter);
 // Remove separate mounts and use the combined profilePicture route
 app.use("/api", require("./profilePicture"));
@@ -44,14 +44,10 @@ app.use("/api/polls", pollRouter);
 
 app.post("/api/register", async (req, res) => {
   const { email, password, role } = req.body;
-  console.log("[INFO] Received registration request for email:", email);
-
   try {
     const loginId = await registerAndSendEmail(email, password, role || 1);
-    console.log("[INFO] Registration successful for email:", email, "with login ID:", loginId);
     res.status(200).json({ message: "User registered successfully! Please verify your email.", loginId });
   } catch (error) {
-    console.error("[ERROR] Registration error for email:", email, error);
     res.status(500).json({ message: error.message || "Registration failed" });
   }
 });
@@ -64,13 +60,9 @@ app.get("/api/verify", async (req, res) => {
   }
   try {
     const verified = await verifyEmail(token);
-    if (verified) {
-      res.send("Email verification successful. You can now log in.");
-    } else {
-      res.status(400).send("Email verification failed.");
-    }
+    verified ? res.send("Email verification successful. You can now log in.")
+             : res.status(400).send("Email verification failed.");
   } catch (error) {
-    console.error("[ERROR] Verification error:", error);
     res.status(400).send("Invalid or expired token.");
   }
 });
@@ -78,12 +70,10 @@ app.get("/api/verify", async (req, res) => {
 // Login endpoint – only verified users can log in.
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
-  console.log("[INFO] Login request for email:", email);
   try {
     const { token, userDetails } = await loginUser(email, password);
     res.status(200).json({ message: "Login successful", token, userDetails });
   } catch (error) {
-    console.error("[ERROR] Login error for email:", email, error);
     res.status(400).json({ message: error.message || "Login failed" });
   }
 });
@@ -97,7 +87,6 @@ app.post("/api/saveclasses", async (req, res) => {
     await updateUserClasses(user_id, classes);
     res.status(200).json({ message: "Classes saved successfully." });
   } catch (error) {
-    console.error("[ERROR] Saving classes:", error);
     res.status(500).json({ message: error.message || "Failed to save classes." });
   }
 });
@@ -110,17 +99,37 @@ app.get("/accountDetails", async (req, res) => {
   try {
     const details = await getAccountDetails(userId);
     res.json(details);
-    console.log(details);
   } catch (error) {
     res.status(500).send(error.message);
   }
 });
 
+const connectedClients = new Set(); // NEW: Track logged sockets
+
+// NEW: Add caching for poll data to reduce db queries (cache duration: 3 seconds)
+const CACHE_DURATION = 3000; // in milliseconds
+let pollsCache = null;
+let pollsCacheTimestamp = 0;
+
+const getPollsCached = async () => {
+  const now = Date.now();
+  if (pollsCache && now - pollsCacheTimestamp < CACHE_DURATION) {
+    return pollsCache;
+  }
+  pollsCache = await getPolls();
+  pollsCacheTimestamp = now;
+  return pollsCache;
+};
+
 // WebSocket connection handling
 io.on("connection", async (socket) => {
-  console.log("[INFO] New client connected:", socket.id);
+  // Log connection only once per socket id
+  if (!connectedClients.has(socket.id)) {
+    console.log(`[INFO] New client connected: ${socket.id}`);
+    connectedClients.add(socket.id);
+  }
   try {
-    const polls = await getPolls();
+    const polls = await getPollsCached();
     socket.emit("pollsUpdated", polls);
   } catch (error) {
     console.error("[ERROR] Failed to fetch polls on connection:", error);
@@ -128,27 +137,26 @@ io.on("connection", async (socket) => {
 
   socket.on("disconnect", () => {
     console.log("[INFO] Client disconnected:", socket.id);
+    connectedClients.delete(socket.id);
   });
 
   socket.on("newPoll", async (newPoll) => {
-    console.log("[INFO] Received new poll:", newPoll);
     try {
-      const polls = await getPolls();
+      // Invalidate cache on new poll creation
+      pollsCache = null;
+      const polls = await getPollsCached();
       io.emit("pollsUpdated", polls);
-    } catch (error) {
-      console.error("[ERROR] Error handling new poll:", error);
-    }
+    } catch (error) { /* no logging */ }
   });
 
   socket.on("vote", async (optionId) => {
-    console.log("[INFO] Received vote for option ID:", optionId);
     try {
       await vote(optionId);
-      const polls = await getPolls();
+      // Invalidate cache on vote
+      pollsCache = null;
+      const polls = await getPollsCached();
       io.emit("pollsUpdated", polls);
-    } catch (error) {
-      console.error("[ERROR] Error processing vote:", error);
-    }
+    } catch (error) { /* no logging */ }
   });
 });
 
@@ -187,4 +195,18 @@ server.listen(PORT, () => {
   } catch (err) {
     console.error("[ERROR] Unable to update .env file", err);
   }
+
+  // After server.listen, add a scheduled deletion job:
+  setInterval(async () => {
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    try {
+      const { getConnection } = require("./db");
+      const connection = await getConnection();
+      // Delete expired polls (assuming ON DELETE CASCADE cleans up poll_options, otherwise add additional deletion)
+      await connection.query("DELETE FROM polls WHERE expiry IS NOT NULL AND expiry <= ?", [now]);
+      console.log(`[INFO] Expired polls deleted at ${now}`);
+    } catch (err) {
+      console.error("[ERROR] Deleting expired polls failed:", err);
+    }
+  }, 60000); // every 60 seconds
 });

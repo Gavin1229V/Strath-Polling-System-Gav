@@ -21,7 +21,7 @@ const connectToDatabase = async () => {
             stream, // Use the SSH tunnel stream
         });
     } catch (err) {
-        console.error("Database connection failed:", err);
+        // Removed non-user movement logging
         process.exit(1);
     }
 };

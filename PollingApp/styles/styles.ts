@@ -51,9 +51,10 @@ const styles = StyleSheet.create({
   },
   // Poll question style
   questionText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
-    marginVertical: 10,
+    textAlign: "center",
+    marginBottom: 10,
     color: "#333",
   },
   subHeader: {
@@ -77,16 +78,90 @@ const styles = StyleSheet.create({
   // Poll-specific card style
   pollCard: {
     backgroundColor: "#fff",
-    padding: 20,
-    marginVertical: 10,
-    borderRadius: 5,
-    elevation: 3,
+    borderRadius: 8,
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  pollQuestion: {
+  classCode: {
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  colorSwatches: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  swatchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  swatchBox: {
+    width: 15,
+    height: 15,
+    marginRight: 3,
+  },
+  swatchText: {
+    fontSize: 12,
+  },
+  voteRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginVertical: 10,
+  },
+  voteButtonContainer: {
+    alignItems: "center",
+    marginHorizontal: 10,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 50,
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  infoOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: -10000,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-start",
+    padding: 20,
+  },
+  infoCard: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    position: "relative",
+  },
+  infoProfilePic: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    position: "absolute",
+    top: 20,
+    right: 20,
+  },
+  infoTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
@@ -184,6 +259,77 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 3,
     borderRadius: 5,
+  },
+  // PollCreator common styles
+  pollCreatorContainer: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    backgroundColor: "#fff",
+  },
+  pollCreatorHeader: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  pollCreatorLabel: {
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  pollCreatorInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    marginBottom: 16,
+    width: "100%",
+    backgroundColor: "#fafafa",
+  },
+  pollCreatorButton: {
+    backgroundColor: "#007bff",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    marginBottom: 16,
+  },
+  pollCreatorButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  pollCreatorRemoveButton: {
+    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#f8d7da",
+    borderRadius: 6,
+  },
+  pollCreatorRemoveButtonText: {
+    color: "#d9534f",
+    fontWeight: "600",
+  },
+  pollCreatorModalScroll: {
+    maxHeight: 200,
+  },
+  pollCreatorModalOption: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  pollCreatorModalCancel: {
+    padding: 10,
+    alignItems: "center",
+  },
+  pollCreatorStatus: {
+    marginTop: 20,
+    color: "green",
+    fontWeight: "600",
   },
 });
 

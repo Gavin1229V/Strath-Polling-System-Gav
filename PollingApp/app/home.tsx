@@ -13,7 +13,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Buffer } from "buffer"; // NEW: import Buffer to convert buffers
 import { useFocusEffect } from '@react-navigation/native'; // NEW import
 
-const convertToBase64Uri = (pic: any): string => {
+// Moved outside the component to prevent re-creation on every render.
+export const convertToBase64Uri = (pic: any): string => {
   if (!pic) return "";
   if (typeof pic === "string") {
     return pic.startsWith("data:") ? pic : "data:image/jpeg;base64," + pic;
@@ -90,27 +91,44 @@ const HomeScreen = () => {
     loadUserProfile();
   }, [user]);
 
-  // Add useFocusEffect hook to refresh profile picture on screen focus:
+  // Combined useFocusEffect for refreshing profile picture and classes
   useFocusEffect(
     React.useCallback(() => {
-      if (user) {
-        fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`)
-          .then((res) => res.json())
-          .then((data) => {
-            // Removed verbose log: "Focus fetched profilePicture data:" 
-            if (data && data.profile_picture) {
-              let pic = data.profile_picture;
-              pic = convertToBase64Uri(pic);
+      const fetchProfileAndClasses = async () => {
+        if (user) {
+          try {
+            const [picRes, accountRes] = await Promise.all([
+              fetch(`${SERVER_IP}/api/profilePicture?userId=${user.user_id}`).then(res => res.json()),
+              fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`).then(res => res.json())
+            ]);
+            if (picRes && picRes.profile_picture) {
+              let pic = convertToBase64Uri(picRes.profile_picture);
               if (pic) {
                 setProfilePicture(pic);
                 setUser({ ...user, profile_picture: pic });
               }
             }
-          })
-          .catch((err) => {
-            console.error("Error fetching profile picture on focus:", err);
-          });
-      }
+            if (accountRes && accountRes.length > 0) {
+              const account = accountRes[0];
+              if (account.classes && account.classes !== user.classes) {
+                interface AccountDetails {
+                  classes: string;
+                }
+
+                const updatedClasses: string[] = (account as AccountDetails).classes
+                  .split(",")
+                  .map((cls: string): string => cls.trim())
+                  .filter(Boolean);
+                setLocalClasses(updatedClasses);
+                setUser({ ...user, classes: account.classes });
+              }
+            }
+          } catch (err) {
+            console.error("Error in useFocusEffect:", err);
+          }
+        }
+      };
+      fetchProfileAndClasses();
       return () => {};
     }, [user])
   );
@@ -132,38 +150,6 @@ const HomeScreen = () => {
       setLocalClasses([]);
     }
   }, [user?.classes]);
-
-  // New useFocusEffect to refresh classes on home focus
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user) {
-        fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
-          .then(res => res.json())
-          .then(details => {
-            if (details && details.length > 0) {
-              const account = details[0];
-              if (account.classes) {
-                // Only update if the fetched classes differ from current user.classes
-                if (account.classes !== user.classes) {
-                  interface Account {
-                    classes: string;
-                  }
-
-                  const updatedClasses: string[] = (account as Account).classes
-                    .split(",")
-                    .map((cls: string): string => cls.trim())
-                    .filter(Boolean);
-                  setLocalClasses(updatedClasses);
-                  setUser({ ...user, classes: account.classes });
-                }
-              }
-            }
-          })
-          .catch(err => console.error("Error refreshing classes:", err));
-      }
-      return () => {};
-    }, [user])
-  );
 
   // New function to pick image with blob conversion
   const pickImage = async () => {

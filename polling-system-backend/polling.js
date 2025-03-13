@@ -1,34 +1,25 @@
 const { connectionPromise, getConnection } = require("./db"); // Import MySQL connection and connection promise
 
 // Create a new poll with author and created_at
-const createPoll = async (question, options, created_by, created_by_id, pollClass, global) => {
+const createPoll = async (question, options, created_by, created_by_id, pollClass, expiry, global) => {
     await connectionPromise; // Ensure the connection is established
     const connection = await getConnection(); // Updated: await getConnection
 
     if (!question || !Array.isArray(options) || options.length < 2) {
-        console.error("[DEBUG] Invalid input: question or options are not valid.", { question, options });
         throw new Error("Invalid input: Poll must have a question and at least two options.");
     }
 
     // Replace the old Date format with MySQL datetime format
-    // Old code: const createdAt = new Date().toISOString();
     const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    console.log("[DEBUG] Creating poll with question:", question);
-    console.log("[DEBUG] Options provided:", options);
-    console.log("[DEBUG] Poll author:", created_by);
-    console.log("[DEBUG] Created by ID:", created_by_id);
 
     try {
-        // Updated: Insert poll with question, created_by, created_by_id, created_at, and class
-        const query = `INSERT INTO polls (question, created_by, created_by_id, created_at, class) VALUES (?, ?, ?, ?, ?)`;
-        const [result] = await connection.query(query, [question, created_by, created_by_id, createdAt, pollClass]);
+        // Updated: Insert poll with question, created_by, created_by_id, created_at, class, and expiry
+        const query = `INSERT INTO polls (question, created_by, created_by_id, created_at, class, expiry) VALUES (?, ?, ?, ?, ?, ?)`;
+        const [result] = await connection.query(query, [question, created_by, created_by_id, createdAt, pollClass, expiry]);
         const pollId = result.insertId;
-
-        console.log("[DEBUG] Poll created with ID:", pollId);
 
         // Insert options into the database
         const optionQueries = options.map((option, index) => {
-            console.log("[DEBUG] Inserting option:", { pollId, index, option });
             return connection.query(
                 `INSERT INTO poll_options (poll_id, option_index, option_text) VALUES (?, ?, ?)`,
                 [pollId, index, option]
@@ -36,11 +27,9 @@ const createPoll = async (question, options, created_by, created_by_id, pollClas
         });
 
         await Promise.all(optionQueries);
-        console.log("[DEBUG] Options inserted for poll ID:", pollId);
 
         return pollId;
     } catch (error) {
-        console.error("[ERROR] Error creating poll:", error);
         throw new Error("Failed to create poll.");
     }
 };
@@ -50,8 +39,6 @@ const getPolls = async () => {
     await connectionPromise; // Ensure the connection is established
     try {
         const connection = await getConnection(); // Updated: await getConnection
-
-        console.log("[DEBUG] Fetching all polls with their options");
 
         const query = `
             SELECT p.id, p.question, p.created_by, p.created_by_id, p.created_at, 
@@ -93,7 +80,6 @@ const getPolls = async () => {
 
         return Object.values(polls);
     } catch (error) {
-        console.error("Failed to fetch polls on connection:", error);
         throw new Error("Failed to fetch polls.");
     }
 };
@@ -104,11 +90,8 @@ const vote = async (optionId) => {
     const connection = await getConnection(); // Updated: await getConnection
 
     if (!optionId) {
-        console.error("[DEBUG] Invalid input: Option ID is required.");
         throw new Error("Invalid input: Option ID is required.");
     }
-
-    console.log("[DEBUG] Registering vote for option ID:", optionId);
 
     try {
         const query = `UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?`;
@@ -116,13 +99,9 @@ const vote = async (optionId) => {
         const [result] = await connection.query(query, [optionId]);
 
         if (result.affectedRows === 0) {
-            console.warn("[DEBUG] No option found with the given ID:", optionId);
             throw new Error("No option found with the given ID.");
         }
-
-        console.log("[DEBUG] Vote registered for option ID:", optionId);
     } catch (error) {
-        console.error("[ERROR] Error registering vote:", error);
         throw new Error("Failed to register vote.");
     }
 };

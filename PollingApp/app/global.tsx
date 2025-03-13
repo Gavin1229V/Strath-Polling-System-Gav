@@ -13,6 +13,7 @@ export type Poll = {
     pollClass: string;  // renamed from "class"
     created_by: string;
     created_at: string;
+    expiry: string; // added expiry field as a datetime string
     options: PollOption[];
     created_by_id?: number;
     profile_picture?: string;
@@ -36,4 +37,5 @@ export const fetchPolls = async (setPolls: React.Dispatch<React.SetStateAction<P
     }
 };
 
-export default global;
+// Remove the incorrect default export:
+// export default global;
