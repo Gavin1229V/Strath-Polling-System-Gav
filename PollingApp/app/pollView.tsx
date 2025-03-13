@@ -21,6 +21,8 @@ import { SERVER_IP } from "./config";
 import { Poll } from "./global";
 import { useUserClasses, useAuth } from "./userDetails";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { VictoryPie } from "victory-native/lib/components/victory-pie";
+
 
 const PollView = () => {
   const { activeFilter: initialFilter } = useLocalSearchParams<{ activeFilter?: string }>();
@@ -256,21 +258,23 @@ const PollView = () => {
       }
     }
 
+    // Transform data for VictoryPie
     const data = poll.options.map((option, index) => ({
-      name: option.text,
-      votes: option.votes,
+      x: option.text,
+      y: option.votes || 0.001, // Avoid zero values which can cause rendering issues
       color: chartColors[index % chartColors.length],
-      legendFontColor: "#000",
-      legendFontSize: 12,
     }));
+
+    // Skip rendering chart if all votes are 0
+    const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
 
     // Adjust chart size based on screen width
     const chartWidth = Math.min(300, screenWidth - 60);
-    const chartHeight = Math.min(200, chartWidth * 0.8);
+    const chartHeight = Math.min(220, chartWidth * 0.8);
 
     return (
       <View style={{ marginVertical: 10, position: "relative" }}>
-        {/* Move info button to top-right for a cleaner look */}
+        {/* Info button top-right */}
         <TouchableOpacity
           onPress={() => openInfoOverlay(poll)}
           style={{
@@ -298,24 +302,59 @@ const PollView = () => {
         <Text style={styles.questionText}>{poll.question}</Text>
 
         {/* Centered chart */}
-        <View style={{ alignItems: "center", alignSelf: "center" }}>
-          <PieChart
-            data={data}
-            width={chartWidth}
-            height={chartHeight}
-            chartConfig={{
-              backgroundGradientFrom: "transparent",
-              backgroundGradientTo: "transparent",
-              color: () => `rgba(0, 0, 0, 1)`,
-              labelColor: () => `rgba(0, 0, 0, 1)`,
-              decimalPlaces: 0,
-            }}
-            accessor={"votes"}
-            backgroundColor={"transparent"}
-            paddingLeft={"10"}
-            absolute
-            hasLegend={false}
-          />
+        <View style={{ alignItems: "center", alignSelf: "center", marginVertical: 10 }}>
+          {totalVotes > 0 ? (
+            <VictoryPie
+              data={data}
+              width={chartWidth}
+              height={chartHeight}
+              padding={40}
+              innerRadius={30}
+
+              style={{
+                data: { 
+                  fill: ({ datum }) => datum.color,
+                  stroke: "#fff",
+                  strokeWidth: 1
+                },
+                labels: { 
+                  fill: "#fff",
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  textShadow: "1px 1px 2px rgba(0,0,0,0.5)"
+                }
+              }}
+              animate={{
+                duration: 1000,
+                easing: "bounce",
+                onLoad: { duration: 500 }
+              }}
+              labelPlacement="parallel"
+              labels={({ datum }) => 
+                totalVotes > 0 && datum.y/totalVotes > 0.05 ? 
+                  `${Math.round((datum.y/totalVotes)*100)}%` : ""
+              }
+            />
+          ) : (
+            <Text style={{ fontSize: 16, color: "#666", padding: 20 }}>
+              No votes yet
+            </Text>
+          )}
+          
+          {/* Custom legend */}
+          <View style={{ width: chartWidth, marginTop: 10 }}>
+            {data.map((item, index) => (
+              <View key={index} style={{ flexDirection: "row", alignItems: "center", marginVertical: 5 }}>
+                <View style={[styles.swatchBox, { backgroundColor: item.color }]} />
+                <Text style={[styles.swatchText, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
+                  {item.x}
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: "500", marginLeft: 5 }}>
+                  {item.y} vote{item.y !== 1 ? 's' : ''}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
       </View>
     );
@@ -342,7 +381,6 @@ const PollView = () => {
                 <View style={[styles.swatchBox, { backgroundColor: chartColors[index % chartColors.length] }]} />
                 <Text style={styles.swatchText}>{option.text}</Text>
               </View>
-              <Text style={{ marginBottom: 4 }}>({option.votes})</Text>
               <TouchableOpacity 
                 style={styles.voteButton}
                 onPress={() => vote(option.id)}
@@ -473,7 +511,7 @@ const PollView = () => {
                       ? infoPoll.profile_picture.slice(1, -1)
                       : infoPoll.profile_picture,
                 }}
-                style={styles.infoProfilePic}
+                style={[styles.infoProfilePic, { marginTop: 10, width: 90, height: 90, borderRadius: 50 }]}
               />
             ) : null}
             <Text style={styles.infoTitle}>Poll Info</Text>

@@ -198,6 +198,13 @@ export const fetchPolls = async (
     }
   }
   
-  // This should never be reached due to the throw in the catch block
-  throw new Error("Unexpected error in fetchPolls");
+  // This code should only be reached if the while loop completes without returning
+  // Add a fallback to ensure we either return data or throw a specific error
+  if (pollsCache.data) {
+    console.log("Loop completed without resolution, using cache as fallback");
+    setPollsState(pollsCache.data);
+    return pollsCache.data;
+  }
+  
+  throw new Error("Failed to fetch polls after maximum retries");
 };

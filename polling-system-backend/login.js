@@ -5,10 +5,10 @@ const bcrypt = require("bcrypt");
 
 /**
  * Log a user in by verifying credentials and ensuring their email is verified.
- * @param {string} email - The user’s email address.
- * @param {string} password - The user’s password.
+ * @param {string} email - The user's email address.
+ * @param {string} password - The user's password.
  * @returns {Object} An object containing a JWT token for the session and user details.
- * @throws {Error} If the user is not found, password is incorrect, or email isn’t verified.
+ * @throws {Error} If the user is not found, password is incorrect, or email isn't verified.
  */
 const loginUser = async (email, password) => {
   await connectionPromise; // Ensure the database connection is ready

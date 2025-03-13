@@ -8,13 +8,15 @@ import {
   ScrollView,
   Platform,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { fetchPolls } from "./global";
+import { fetchPolls, getSocket } from "./global";
 import { SERVER_IP } from "./config";
 import { useFirstName, useLastName, useAuth, useUserClasses } from "./userDetails";
 import { Poll } from "./global";
 import styles from "../styles/styles"; // Use global styles
+import { Ionicons } from '@expo/vector-icons'; // Make sure to install this if not already installed
 
 ////////////////////////////////////////////////////////////////////////////////
 // Compute default expiry value (one day ahead)
@@ -31,6 +33,167 @@ const getDefaultExpiry = () => {
 
 const defaultExpiry = getDefaultExpiry();
 
+// Additional local styles for the enhanced UI
+const localStyles = StyleSheet.create({
+  formCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#333',
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 6,
+    color: '#555',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 15,
+    backgroundColor: '#fafafa',
+  },
+  inputFocused: {
+    borderColor: '#4287f5',
+    backgroundColor: '#f0f7ff',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  optionInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 10,
+    backgroundColor: '#fafafa',
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f2f2f2',
+  },
+  primaryButton: {
+    backgroundColor: '#4287f5',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  secondaryButton: {
+    backgroundColor: '#e7f0fd',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  secondaryButtonText: {
+    color: '#4287f5',
+    fontWeight: '500',
+    fontSize: 15,
+    marginLeft: 6,
+  },
+  dropdownSelect: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fafafa',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 45,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    zIndex: 100,
+    maxHeight: 200,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  dropdownItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dateTimeButton: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: '#f8f8f8',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 4,
+  },
+  dateTimeText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  requiredIndicator: {
+    color: '#e53935',
+    marginLeft: 4,
+  },
+  validationError: {
+    color: '#e53935',
+    fontSize: 12,
+    marginTop: 4,
+  }
+});
+
 ////////////////////////////////////////////////////////////////////////////////
 // Main component
 ////////////////////////////////////////////////////////////////////////////////
@@ -45,6 +208,15 @@ const PollScreen = () => {
   });
   const [voteStatus, setVoteStatus] = useState("");
   const [isPollClassModalVisible, setPollClassModalVisible] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [validation, setValidation] = useState({
+    question: true,
+    options: [true, true],
+    pollClass: true,
+  });
+  
+  // Input focus states for enhanced styling
+  const [focusedField, setFocusedField] = useState("");
 
   // Auth / user details
   const { user } = useAuth();
@@ -62,6 +234,10 @@ const PollScreen = () => {
   const firstName = useFirstName();
   const lastName = useLastName();
   const author = `${firstName} ${lastName}`.trim();
+
+  // For native date/time pickers
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Load polls initially
   useEffect(() => {
@@ -83,23 +259,40 @@ const PollScreen = () => {
     }
   }, [user]);
 
+  // Validate poll inputs
+  const validatePoll = () => {
+    // Validate question
+    const isQuestionValid = newPoll.question.trim().length > 0;
+    
+    // Validate options
+    const optionsValidation = newPoll.options.map(opt => opt.trim().length > 0);
+    const validOptions = newPoll.options.filter(opt => opt.trim().length > 0);
+    
+    // Validate class
+    const isClassValid = newPoll.pollClass.trim().length > 0;
+
+    // Update validation state
+    setValidation({
+      question: isQuestionValid,
+      options: optionsValidation,
+      pollClass: isClassValid,
+    });
+
+    return isQuestionValid && validOptions.length >= 2 && isClassValid;
+  };
+
   // Create a new poll
   const createPoll = async () => {
-    const filteredOptions = newPoll.options.filter(
-      (option) => option.trim() !== ""
-    );
-    if (
-      !newPoll.pollClass.trim() ||
-      !newPoll.question.trim() ||
-      filteredOptions.length < 2
-    ) {
-      Alert.alert(
-        "Validation Error",
-        "Poll must have a poll class, a question, and at least two valid options."
-      );
+    if (!validatePoll()) {
       return;
     }
+    
+    setIsCreating(true);
+    
+    const filteredOptions = newPoll.options.filter(option => option.trim() !== "");
+    
     try {
+      const socket = getSocket();
       const response = await fetch(`${SERVER_IP}/api/polls`, {
         method: "POST",
         headers: {
@@ -116,10 +309,12 @@ const PollScreen = () => {
           global: false,
         }),
       });
+      
       if (!response.ok) {
         throw new Error(`Error creating poll: ${response.statusText}`);
       }
-      // Reset newPoll: set expiryDate and expiryTime back to default values instead of empty strings.
+      
+      // Reset form with default expiry values
       setNewPoll({
         question: "",
         options: ["", ""],
@@ -127,10 +322,27 @@ const PollScreen = () => {
         expiryDate: defaultExpiry.date,
         expiryTime: defaultExpiry.time,
       });
-      fetchPolls(setPolls);
+      
+      // Show success message
+      setVoteStatus("Poll created successfully!");
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setVoteStatus(""), 3000);
+      
+      // Refresh polls list
+      await fetchPolls(setPolls, true);
+      
+      // Emit event to notify other clients
+      socket.emit('poll_created');
+      
     } catch (err) {
       console.error("Error creating poll:", err);
-      Alert.alert("Error", "An error occurred while creating the poll.");
+      setVoteStatus("Failed to create poll. Please try again.");
+      
+      // Clear error message after 3 seconds
+      setTimeout(() => setVoteStatus(""), 3000);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -138,316 +350,400 @@ const PollScreen = () => {
   const removeOption = (index: number) => {
     const options = [...newPoll.options];
     options.splice(index, 1);
+    
+    // Update validation state
+    const optionsValidation = [...validation.options];
+    optionsValidation.splice(index, 1);
+    setValidation({ ...validation, options: optionsValidation });
+    
     setNewPoll({ ...newPoll, options });
   };
 
-  // For native date/time pickers
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  // Add a new option
+  const addOption = () => {
+    setNewPoll({ ...newPoll, options: [...newPoll.options, ""] });
+    setValidation({ ...validation, options: [...validation.options, true] });
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "Select date";
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    } catch (e) {
+      return dateString;
+    }
+  };
 
   return (
-    <View style={styles.pollCreatorContainer}>
-      <Text style={styles.pollCreatorHeader}>Create a New Poll</Text>
-
-      {/* Poll question */}
-      <TextInput
-        style={styles.pollCreatorInput}
-        placeholder="Poll question"
-        placeholderTextColor="#333"
-        value={newPoll.question}
-        onChangeText={(text) => setNewPoll({ ...newPoll, question: text })}
-      />
-
-      {/* Poll options */}
-      {newPoll.options.map((option, index) => (
-        <View
-          key={index}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 12,
-          }}
-        >
-          <TextInput
-            style={[styles.pollCreatorInput, { flex: 1 }]}
-            placeholder={`Option ${index + 1}`}
-            placeholderTextColor="#333"
-            value={option}
-            onChangeText={(text) => {
-              const options = [...newPoll.options];
-              options[index] = text;
-              setNewPoll({ ...newPoll, options });
-            }}
-          />
-          {newPoll.options.length > 2 && (
-            <TouchableOpacity
-              style={styles.pollCreatorRemoveButton}
-              onPress={() => removeOption(index)}
-            >
-              <Text style={styles.pollCreatorRemoveButtonText}>Remove</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ))}
-
-      {newPoll.options.length < 5 && (
-        <TouchableOpacity
-          style={styles.pollCreatorButton}
-          onPress={() =>
-            setNewPoll({ ...newPoll, options: [...newPoll.options, ""] })
-          }
-        >
-          <Text style={styles.pollCreatorButtonText}>Add Another Option</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Poll class dropdown */}
-      <TouchableOpacity
-        style={[
-          styles.pollCreatorInput,
-          { justifyContent: "center", marginBottom: 16 },
-        ]}
-        onPress={() => setPollClassModalVisible(true)}
-      >
-        <Text style={{ color: newPoll.pollClass ? "#000" : "#999" }}>
-          {newPoll.pollClass ? newPoll.pollClass : "Select poll class"}
+    <ScrollView style={{ flex: 1, backgroundColor: '#f5f5f7' }}>
+      <View style={{ padding: 16, paddingBottom: 60 }}>
+        <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 16, marginTop: 8, color: '#333' }}>
+          Create a New Poll
         </Text>
-      </TouchableOpacity>
-
-      {isPollClassModalVisible && (
-        <View
-          style={{
-            position: "absolute",
-            top: 140,
-            left: 20,
-            right: 20,
-            backgroundColor: "#fff",
-            borderWidth: 1,
-            borderColor: "#ccc",
-            borderRadius: 5,
-            zIndex: 100,
-            paddingVertical: 5,
-          }}
-        >
-          <ScrollView style={styles.pollCreatorModalScroll}>
-            {classesList.map((cls, idx) => (
-              <TouchableOpacity
-                key={idx}
-                onPress={() => {
-                  setNewPoll({ ...newPoll, pollClass: cls });
-                  setPollClassModalVisible(false);
+        
+        {/* Poll Question Section */}
+        <View style={localStyles.formCard}>
+          <Text style={localStyles.sectionTitle}>Question <Text style={localStyles.requiredIndicator}>*</Text></Text>
+          <View style={localStyles.inputContainer}>
+            <TextInput
+              style={[
+                localStyles.input, 
+                focusedField === 'question' && localStyles.inputFocused,
+                !validation.question && { borderColor: '#e53935' }
+              ]}
+              placeholder="Enter your poll question here"
+              placeholderTextColor="#999"
+              value={newPoll.question}
+              onChangeText={(text) => {
+                setNewPoll({ ...newPoll, question: text });
+                if (!validation.question && text.trim()) {
+                  setValidation({ ...validation, question: true });
+                }
+              }}
+              onFocus={() => setFocusedField('question')}
+              onBlur={() => setFocusedField('')}
+            />
+            {!validation.question && (
+              <Text style={localStyles.validationError}>Question is required</Text>
+            )}
+          </View>
+        </View>
+        
+        {/* Poll Options Section */}
+        <View style={localStyles.formCard}>
+          <Text style={localStyles.sectionTitle}>Options <Text style={localStyles.requiredIndicator}>*</Text></Text>
+          <Text style={{ color: '#666', marginBottom: 12, fontSize: 13 }}>
+            Add at least two options for your poll (maximum 5)
+          </Text>
+          
+          {newPoll.options.map((option, index) => (
+            <View key={index} style={localStyles.optionRow}>
+              <TextInput
+                style={[
+                  localStyles.optionInput,
+                  focusedField === `option-${index}` && localStyles.inputFocused,
+                  !validation.options[index] && { borderColor: '#e53935' }
+                ]}
+                placeholder={`Option ${index + 1}`}
+                placeholderTextColor="#999"
+                value={option}
+                onChangeText={(text) => {
+                  const options = [...newPoll.options];
+                  options[index] = text;
+                  setNewPoll({ ...newPoll, options });
+                  
+                  if (!validation.options[index] && text.trim()) {
+                    const newOptionsValidation = [...validation.options];
+                    newOptionsValidation[index] = true;
+                    setValidation({ ...validation, options: newOptionsValidation });
+                  }
                 }}
-                style={styles.pollCreatorModalOption}
-              >
-                <Text>{cls}</Text>
-              </TouchableOpacity>
-            ))}
+                onFocus={() => setFocusedField(`option-${index}`)}
+                onBlur={() => setFocusedField('')}
+              />
+              {newPoll.options.length > 2 && (
+                <TouchableOpacity
+                  style={localStyles.iconButton}
+                  onPress={() => removeOption(index)}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#f44336" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+          
+          {newPoll.options.length < 5 && (
             <TouchableOpacity
-              onPress={() => setPollClassModalVisible(false)}
-              style={styles.pollCreatorModalCancel}
+              style={localStyles.secondaryButton}
+              onPress={addOption}
             >
-              <Text style={{ fontWeight: "bold" }}>Cancel</Text>
+              <Ionicons name="add-circle-outline" size={18} color="#4287f5" />
+              <Text style={localStyles.secondaryButtonText}>Add Option</Text>
             </TouchableOpacity>
-          </ScrollView>
+          )}
+          
+          {newPoll.options.filter(opt => opt.trim()).length < 2 && (
+            <Text style={localStyles.validationError}>At least two non-empty options are required</Text>
+          )}
         </View>
-      )}
-
-      {/* Expires heading */}
-      <Text style={[styles.pollCreatorLabel, { marginTop: 10 }]}>Expires at:</Text>
-
-      {Platform.OS === "web" ? (
-        // Web: show input fields
-        <View style={{ marginBottom: 16, width: "100%" }}>
-          <input
-            type="date"
-            value={newPoll.expiryDate}
-            onChange={(e) =>
-              setNewPoll({ ...newPoll, expiryDate: e.target.value })
-            }
-            style={{
-              width: "100%",
-              padding: 10,
-              borderRadius: 6,
-              border: "1px solid #ccc",
-              backgroundColor: "#fafafa",
-              marginBottom: 10,
-            }}
-          />
-          <input
-            type="time"
-            value={newPoll.expiryTime}
-            onChange={(e) =>
-              setNewPoll({ ...newPoll, expiryTime: e.target.value })
-            }
-            style={{
-              width: "100%",
-              padding: 10,
-              borderRadius: 6,
-              border: "1px solid #ccc",
-              backgroundColor: "#fafafa",
-            }}
-          />
-        </View>
-      ) : Platform.OS === "ios" ? (
-        // iOS: show inline DateTimePickers
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16, width: "100%" }}>
-          <View style={{ flex: 1, marginRight: 8 }}>
-            <DateTimePicker
-              mode="date"
-              display="default"
-              value={
-                newPoll.expiryDate
-                  ? new Date(newPoll.expiryDate)
-                  : new Date(Date.now() + 24 * 60 * 60 * 1000)
-              }
-              onChange={(event, selectedDate) => {
-                if (selectedDate) {
-                  const year = selectedDate.getFullYear();
-                  const month = ("0" + (selectedDate.getMonth() + 1)).slice(-2);
-                  const day = ("0" + selectedDate.getDate()).slice(-2);
-                  setNewPoll((prev) => ({
-                    ...prev,
-                    expiryDate: `${year}-${month}-${day}`,
-                  }));
-                }
-              }}
-            />
-          </View>
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <DateTimePicker
-              mode="time"
-              display="default"
-              is24Hour={true}
-              value={
-                newPoll.expiryTime
-                  ? new Date(`1970-01-01T${newPoll.expiryTime}:00`)
-                  : new Date()
-              }
-              onChange={(event, selectedTime) => {
-                if (selectedTime) {
-                  const hours = ("0" + selectedTime.getHours()).slice(-2);
-                  const minutes = ("0" + selectedTime.getMinutes()).slice(-2);
-                  setNewPoll((prev) => ({
-                    ...prev,
-                    expiryTime: `${hours}:${minutes}`,
-                  }));
-                }
-              }}
-            />
+        
+        {/* Class Selection */}
+        <View style={localStyles.formCard}>
+          <Text style={localStyles.sectionTitle}>Class <Text style={localStyles.requiredIndicator}>*</Text></Text>
+          <View style={localStyles.inputContainer}>
+            <TouchableOpacity
+              style={[
+                localStyles.dropdownSelect,
+                !validation.pollClass && { borderColor: '#e53935' }
+              ]}
+              onPress={() => setPollClassModalVisible(true)}
+            >
+              <Text style={{ color: newPoll.pollClass ? '#333' : '#999' }}>
+                {newPoll.pollClass || "Select a class"}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#666" />
+            </TouchableOpacity>
+            
+            {!validation.pollClass && (
+              <Text style={localStyles.validationError}>Class selection is required</Text>
+            )}
+            
+            {isPollClassModalVisible && (
+              <View style={localStyles.dropdownMenu}>
+                <ScrollView style={{ maxHeight: 200 }}>
+                  {classesList.map((cls, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={localStyles.dropdownItem}
+                      onPress={() => {
+                        setNewPoll({ ...newPoll, pollClass: cls });
+                        setValidation({ ...validation, pollClass: true });
+                        setPollClassModalVisible(false);
+                      }}
+                    >
+                      <Text style={localStyles.dropdownItemText}>{cls}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={[localStyles.dropdownItem, { borderBottomWidth: 0, backgroundColor: '#f5f5f5' }]}
+                  onPress={() => setPollClassModalVisible(false)}
+                >
+                  <Text style={{ textAlign: 'center', fontWeight: '600', color: '#666' }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
-      ) : (
-        // Other platforms (e.g., Android): use toggle buttons
-        <>
-          <TouchableOpacity
-            onPress={() => setShowDatePicker(true)}
-            style={{
-              padding: 12,
-              backgroundColor: "#fafafa",
-              borderWidth: 1,
-              borderColor: "#ccc",
-              borderRadius: 8,
-              marginBottom: 10,
-              width: "100%",
-            }}
-          >
-            <Text style={{ color: newPoll.expiryDate ? "#000" : "#999" }}>
-              {newPoll.expiryDate
-                ? newPoll.expiryDate
-                : "Select Expiry Date (YYYY-MM-DD)"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowTimePicker(true)}
-            style={{
-              padding: 12,
-              backgroundColor: "#fafafa",
-              borderWidth: 1,
-              borderColor: "#ccc",
-              borderRadius: 8,
-              marginBottom: 16,
-              width: "100%",
-            }}
-          >
-            <Text style={{ color: newPoll.expiryTime ? "#000" : "#999" }}>
-              {newPoll.expiryTime
-                ? newPoll.expiryTime
-                : "Select Expiry Time (HH:MM 24hr)"}
-            </Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <View style={{ marginBottom: 16, width: "100%" }}>
-              <DateTimePicker
-                mode="date"
-                display="spinner"
-                value={
-                  newPoll.expiryDate
-                    ? new Date(newPoll.expiryDate)
-                    : new Date(Date.now() + 24 * 60 * 60 * 1000)
-                }
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) {
-                    const year = selectedDate.getFullYear();
-                    const month = ("0" + (selectedDate.getMonth() + 1)).slice(-2);
-                    const day = ("0" + selectedDate.getDate()).slice(-2);
-                    setNewPoll((prev) => ({
-                      ...prev,
-                      expiryDate: `${year}-${month}-${day}`,
-                    }));
+        
+        {/* Expiry Settings */}
+        <View style={localStyles.formCard}>
+          <Text style={localStyles.sectionTitle}>Poll Expiry</Text>
+          
+          {Platform.OS === "web" ? (
+            // Web implementation
+            <View style={localStyles.dateTimeRow}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={localStyles.inputLabel}>Date</Text>
+                <input
+                  type="date"
+                  value={newPoll.expiryDate}
+                  onChange={(e) => setNewPoll({ ...newPoll, expiryDate: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e0e0e0',
+                    backgroundColor: '#fafafa',
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={localStyles.inputLabel}>Time</Text>
+                <input
+                  type="time"
+                  value={newPoll.expiryTime}
+                  onChange={(e) => setNewPoll({ ...newPoll, expiryTime: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e0e0e0',
+                    backgroundColor: '#fafafa',
+                  }}
+                />
+              </View>
+            </View>
+          ) : Platform.OS === "ios" ? (
+            // iOS implementation
+            <View style={localStyles.dateTimeRow}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={localStyles.inputLabel}>Date</Text>
+                <DateTimePicker
+                  mode="date"
+                  display="default"
+                  value={
+                    newPoll.expiryDate
+                      ? new Date(newPoll.expiryDate)
+                      : new Date(Date.now() + 24 * 60 * 60 * 1000)
                   }
-                }}
-              />
-              <TouchableOpacity
-                style={styles.pollCreatorButton}
-                onPress={() => setShowDatePicker(false)}
-              >
-                <Text style={styles.pollCreatorButtonText}>Done</Text>
-              </TouchableOpacity>
+                  onChange={(event, selectedDate) => {
+                    if (selectedDate) {
+                      const year = selectedDate.getFullYear();
+                      const month = ("0" + (selectedDate.getMonth() + 1)).slice(-2);
+                      const day = ("0" + selectedDate.getDate()).slice(-2);
+                      setNewPoll((prev) => ({
+                        ...prev,
+                        expiryDate: `${year}-${month}-${day}`,
+                      }));
+                    }
+                  }}
+                  style={{ width: '100%' }}
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={localStyles.inputLabel}>Time</Text>
+                <DateTimePicker
+                  mode="time"
+                  display="default"
+                  is24Hour={true}
+                  value={
+                    newPoll.expiryTime
+                      ? new Date(`1970-01-01T${newPoll.expiryTime}:00`)
+                      : new Date()
+                  }
+                  onChange={(event, selectedTime) => {
+                    if (selectedTime) {
+                      const hours = ("0" + selectedTime.getHours()).slice(-2);
+                      const minutes = ("0" + selectedTime.getMinutes()).slice(-2);
+                      setNewPoll((prev) => ({
+                        ...prev,
+                        expiryTime: `${hours}:${minutes}`,
+                      }));
+                    }
+                  }}
+                  style={{ width: '100%' }}
+                />
+              </View>
+            </View>
+          ) : (
+            // Android implementation
+            <View>
+              <View style={localStyles.dateTimeRow}>
+                <TouchableOpacity
+                  style={[localStyles.dateTimeButton, { marginRight: 8 }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={localStyles.dateTimeText}>
+                    {formatDate(newPoll.expiryDate)}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={18} color="#666" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[localStyles.dateTimeButton, { marginLeft: 8 }]}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Text style={localStyles.dateTimeText}>
+                    {newPoll.expiryTime || "Select time"}
+                  </Text>
+                  <Ionicons name="time-outline" size={18} color="#666" />
+                </TouchableOpacity>
+              </View>
+              
+              {showDatePicker && (
+                <View style={{ marginTop: 16 }}>
+                  <DateTimePicker
+                    mode="date"
+                    display="spinner"
+                    value={
+                      newPoll.expiryDate
+                        ? new Date(newPoll.expiryDate)
+                        : new Date(Date.now() + 24 * 60 * 60 * 1000)
+                    }
+                    onChange={(event, selectedDate) => {
+                      if (selectedDate) {
+                        const year = selectedDate.getFullYear();
+                        const month = ("0" + (selectedDate.getMonth() + 1)).slice(-2);
+                        const day = ("0" + selectedDate.getDate()).slice(-2);
+                        setNewPoll((prev) => ({
+                          ...prev,
+                          expiryDate: `${year}-${month}-${day}`,
+                        }));
+                      }
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={localStyles.primaryButton}
+                    onPress={() => setShowDatePicker(false)}
+                  >
+                    <Text style={localStyles.primaryButtonText}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              {showTimePicker && (
+                <View style={{ marginTop: 16 }}>
+                  <DateTimePicker
+                    mode="time"
+                    display="spinner"
+                    is24Hour={true}
+                    value={
+                      newPoll.expiryTime
+                        ? new Date(`1970-01-01T${newPoll.expiryTime}:00`)
+                        : new Date()
+                    }
+                    onChange={(event, selectedTime) => {
+                      if (selectedTime) {
+                        const hours = ("0" + selectedTime.getHours()).slice(-2);
+                        const minutes = ("0" + selectedTime.getMinutes()).slice(-2);
+                        setNewPoll((prev) => ({
+                          ...prev,
+                          expiryTime: `${hours}:${minutes}`,
+                        }));
+                      }
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={localStyles.primaryButton}
+                    onPress={() => setShowTimePicker(false)}
+                  >
+                    <Text style={localStyles.primaryButtonText}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           )}
-          {showTimePicker && (
-            <View style={{ marginBottom: 16, width: "100%" }}>
-              <DateTimePicker
-                mode="time"
-                display="spinner"
-                is24Hour={true}
-                value={
-                  newPoll.expiryTime
-                    ? new Date(`1970-01-01T${newPoll.expiryTime}:00`)
-                    : new Date()
-                }
-                onChange={(event, selectedTime) => {
-                  if (selectedTime) {
-                    const hours = ("0" + selectedTime.getHours()).slice(-2);
-                    const minutes = ("0" + selectedTime.getMinutes()).slice(-2);
-                    setNewPoll((prev) => ({
-                      ...prev,
-                      expiryTime: `${hours}:${minutes}`,
-                    }));
-                  }
-                }}
-              />
-              <TouchableOpacity
-                style={styles.pollCreatorButton}
-                onPress={() => setShowTimePicker(false)}
-              >
-                <Text style={styles.pollCreatorButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
+        </View>
+        
+        {/* Create Button */}
+        <TouchableOpacity
+          style={[
+            localStyles.primaryButton, 
+            { marginTop: 8, marginBottom: 80 },
+            isCreating && { opacity: 0.7 }
+          ]}
+          onPress={createPoll}
+          disabled={isCreating}
+        >
+          {isCreating ? (
+            <ActivityIndicator color="#ffffff" size="small" />
+          ) : (
+            <Text style={localStyles.primaryButtonText}>
+              Create Poll <Ionicons name="checkmark-circle" size={18} color="#fff" />
+            </Text>
           )}
-        </>
-      )}
-
-      {/* Create poll button */}
-      <TouchableOpacity
-        style={styles.pollCreatorButton}
-        onPress={createPoll}
-      >
-        <Text style={styles.pollCreatorButtonText}>Create Poll</Text>
-      </TouchableOpacity>
-
-      {voteStatus ? <Text style={styles.pollCreatorStatus}>{voteStatus}</Text> : null}
-    </View>
+        </TouchableOpacity>
+        
+        {/* Status Message */}
+        {voteStatus ? (
+          <View style={{
+            padding: 12,
+            backgroundColor: voteStatus.includes('successfully') ? '#e3f5e9' : '#ffebee',
+            borderRadius: 8,
+            marginBottom: 20,
+            flexDirection: 'row',
+            alignItems: 'center'
+          }}>
+            <Ionicons 
+              name={voteStatus.includes('successfully') ? "checkmark-circle" : "alert-circle"} 
+              size={20} 
+              color={voteStatus.includes('successfully') ? '#4caf50' : '#f44336'} 
+              style={{ marginRight: 8 }}
+            />
+            <Text style={{ 
+              color: voteStatus.includes('successfully') ? '#2e7d32' : '#c62828',
+              flex: 1
+            }}>
+              {voteStatus}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </ScrollView>
   );
 };
 
