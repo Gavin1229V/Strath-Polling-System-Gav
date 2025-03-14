@@ -125,19 +125,16 @@ const ElectionsScreen = () => {
         >
           <TouchableOpacity
             style={[
-              styles.filterButton,
+              styles.filterButton, 
               activeYearFilter === null && styles.activeFilterButton,
+              { height: 36 } // Add a fixed height to control button size
             ]}
             onPress={() => setActiveYearFilter(null)}
           >
-            <Text
-              style={[
-                styles.filterButtonText,
-                activeYearFilter === null && styles.activeFilterText,
-              ]}
-            >
-              All Years
-            </Text>
+            <Text style={[
+              styles.filterButtonText,
+              activeYearFilter === null && styles.activeFilterText
+            ]}>All</Text>
           </TouchableOpacity>
           
           {yearGroups.map((year) => (
@@ -146,17 +143,14 @@ const ElectionsScreen = () => {
               style={[
                 styles.filterButton,
                 activeYearFilter === year && styles.activeFilterButton,
+                { height: 36 } // Add a fixed height to control button size
               ]}
               onPress={() => setActiveYearFilter(year)}
             >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  activeYearFilter === year && styles.activeFilterText,
-                ]}
-              >
-                Year {year}
-              </Text>
+              <Text style={[
+                styles.filterButtonText,
+                activeYearFilter === year && styles.activeFilterText
+              ]}>Year {year}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -166,7 +160,6 @@ const ElectionsScreen = () => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        style={{ marginTop: 12 }}
       >
         {filteredElections.length > 0 ? (
           filteredElections.map((election) => (

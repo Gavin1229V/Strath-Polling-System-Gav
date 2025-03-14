@@ -14,7 +14,6 @@ import {
   useWindowDimensions,
   RefreshControl,
 } from "react-native";
-import { PieChart } from 'react-native-chart-kit';
 import styles from "../styles/styles";
 import { fetchPolls, getSocket } from "./global";
 import { SERVER_IP } from "./config";
@@ -142,16 +141,7 @@ const PollView = () => {
         console.error("Error processing updated polls:", error);
       }
     });
-    
-    // Handle socket errors
-    socket.on("error", (error) => {
-      console.error("Socket error:", error);
-    });
-
-    // Make sure socket is connected
-    if (!socket.connected) {
-      socket.connect();
-    }
+  
 
     return () => {
       isMounted = false;
@@ -183,7 +173,7 @@ const PollView = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
