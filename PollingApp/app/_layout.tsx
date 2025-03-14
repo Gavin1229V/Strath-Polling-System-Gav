@@ -22,67 +22,73 @@ function InnerLayout() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-      <Stack screenOptions={{ animation: "none" }}>
-      <Stack.Screen
-        name="index"
-        options={{
-          title: "Welcome",
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="login"
-        options={{
-          title: "Login",
-          headerBackVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="registerPage"
-        options={{
-          title: "Register",
-          headerBackVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="home"
-        options={{
-          title: "Home",
-          headerBackVisible: false,
-          headerLeft: () => null,
-        }}
-      />
-      <Stack.Screen
-        name="classChooser"
-        options={{
-          title: "Choose Your Classes Here",
-          headerBackVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="pollCreator"
-        options={{
-          title: "Poll Creation",
-          headerBackVisible: false,
-          headerLeft: () => null,
-        }}
-      />
-      <Stack.Screen
-        name="pollView"
-        options={{
-          title: "Poll Viewer",
-          headerBackVisible: false,
-          headerLeft: () => null,
-        }}
-      />
-      <Stack.Screen
-        name="settings"
-        options={{
-          title: "Settings",
-          headerBackVisible: true,
-        }}
-      />
-       </Stack>
+        <Stack
+          screenOptions={{
+            animation: "none",
+            headerStyle: { backgroundColor: "#094183" },
+            headerTintColor: "#ffffff",
+          }}
+        >
+          <Stack.Screen
+            name="index"
+            options={{
+              title: "Welcome",
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="login"
+            options={{
+              title: "Login",
+              headerBackVisible: true,
+            }}
+          />
+          <Stack.Screen
+            name="registerPage"
+            options={{
+              title: "Register",
+              headerBackVisible: true,
+            }}
+          />
+          <Stack.Screen
+            name="home"
+            options={{
+              title: "Home",
+              headerBackVisible: false,
+              headerLeft: () => null,
+            }}
+          />
+          <Stack.Screen
+            name="classChooser"
+            options={{
+              title: "Choose Your Classes Here",
+              headerBackVisible: true,
+            }}
+          />
+          <Stack.Screen
+            name="pollCreator"
+            options={{
+              title: "Poll Creation",
+              headerBackVisible: false,
+              headerLeft: () => null,
+            }}
+          />
+          <Stack.Screen
+            name="pollView"
+            options={{
+              title: "Your Polls",
+              headerBackVisible: false,
+              headerLeft: () => null,
+            }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{
+              title: "Settings",
+              headerBackVisible: true,
+            }}
+          />
+        </Stack>
       </View>
       <NavBar />
     </View>

@@ -204,7 +204,7 @@ const PollView = () => {
     );
     socketRef.current.emit("vote", optionId);
     // Remove spinner after short delay (socket will also update on server side)
-    setTimeout(() => setVoteLoading(false), 1000);
+    setTimeout(() => setVoteLoading(false), 2000);
   };
 
   // Pie chart colors with names
@@ -268,9 +268,9 @@ const PollView = () => {
     // Skip rendering chart if all votes are 0
     const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
 
-    // Adjust chart size based on screen width
-    const chartWidth = Math.min(300, screenWidth - 60);
-    const chartHeight = Math.min(220, chartWidth * 0.8);
+    // Increase chart size while keeping it responsive
+    const chartWidth = Math.min(380, screenWidth - 40);
+    const chartHeight = Math.min(280, chartWidth * 0.8);
 
     return (
       <View style={{ marginVertical: 10, position: "relative" }}>
@@ -301,16 +301,15 @@ const PollView = () => {
         {/* Question text */}
         <Text style={styles.questionText}>{poll.question}</Text>
 
-        {/* Centered chart */}
-        <View style={{ alignItems: "center", alignSelf: "center", marginVertical: 10 }}>
+        {/* Centered chart with increased size */}
+        <View style={{ alignItems: "center", alignSelf: "center", marginVertical: 15 }}>
           {totalVotes > 0 ? (
             <VictoryPie
               data={data}
               width={chartWidth}
               height={chartHeight}
-              padding={40}
-              innerRadius={30}
-
+              padding={50}
+              innerRadius={chartWidth * 0.12}
               style={{
                 data: { 
                   fill: ({ datum }) => datum.color,
@@ -319,15 +318,15 @@ const PollView = () => {
                 },
                 labels: { 
                   fill: "#fff",
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: "bold",
                   textShadow: "1px 1px 2px rgba(0,0,0,0.5)"
                 }
               }}
               animate={{
-                duration: 1000,
+                duration: 2000,
                 easing: "bounce",
-                onLoad: { duration: 500 }
+                onLoad: { duration: 1000 }
               }}
               labelPlacement="parallel"
               labels={({ datum }) => 
@@ -341,17 +340,45 @@ const PollView = () => {
             </Text>
           )}
           
-          {/* Custom legend */}
-          <View style={{ width: chartWidth, marginTop: 10 }}>
+          {/* Custom legend - hide vote counts on small mobile */}
+          <View style={{ width: chartWidth, marginTop: 10, paddingHorizontal: isMobile ? 5 : 0 }}>
             {data.map((item, index) => (
-              <View key={index} style={{ flexDirection: "row", alignItems: "center", marginVertical: 5 }}>
-                <View style={[styles.swatchBox, { backgroundColor: item.color }]} />
-                <Text style={[styles.swatchText, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
-                  {item.x}
-                </Text>
-                <Text style={{ fontSize: 12, fontWeight: "500", marginLeft: 5 }}>
-                  {item.y} vote{item.y !== 1 ? 's' : ''}
-                </Text>
+              <View key={index} style={{ 
+                flexDirection: "row", 
+                alignItems: "center", 
+                marginVertical: 5,
+                justifyContent: "space-between",
+                width: '100%',
+                paddingRight: 5
+              }}>
+                <View style={{ 
+                  flexDirection: "row", 
+                  alignItems: "center",
+                  flex: 1,
+                }}>
+                  <View style={[styles.swatchBox, { backgroundColor: item.color, flexShrink: 0 }]} />
+                  <Text 
+                    style={{ 
+                      marginLeft: 8, 
+                      fontSize: isMobile ? 11 : 13,
+                      flex: 1
+                    }} 
+                    numberOfLines={1} 
+                    ellipsizeMode="tail"
+                  >
+                    {item.x}
+                  </Text>
+                </View>
+                {/* Only show vote counts on screens that aren't too small */}
+                {screenWidth >= 360 && (
+                  <Text style={{ 
+                    fontSize: isMobile ? 10 : 12, 
+                    fontWeight: "500",
+                    marginLeft: 4
+                  }}>
+                    {item.y} vote{item.y !== 1 ? 's' : ''}
+                  </Text>
+                )}
               </View>
             ))}
           </View>
@@ -363,26 +390,33 @@ const PollView = () => {
   // Render each poll card
   const renderPoll = ({ item }: { item: Poll }) => {
     return (
-      <View style={styles.pollCard}>
+      <View style={[styles.pollCard, isMobile && { marginHorizontal: 5, padding: 10 }]}>
         {renderPieChart(item)}
         <View style={[
           styles.voteOptionsContainer,
-          isMobile && { flexDirection: "column" }
+          isMobile && { flexDirection: "column", alignItems: "stretch", paddingHorizontal: 10 }
         ]}>
           {item.options.map((option, index) => (
             <View 
               key={option.id} 
               style={[
                 styles.voteButtonContainer,
-                isMobile && { width: "100%", marginVertical: 4 }
+                isMobile && { width: "100%", marginVertical: 4, flexDirection: "row", justifyContent: "space-between" }
               ]}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+              <View style={{ 
+                flexDirection: "row", 
+                alignItems: "center", 
+                marginBottom: isMobile ? 0 : 4,
+                flex: isMobile ? 1 : undefined 
+              }}>
                 <View style={[styles.swatchBox, { backgroundColor: chartColors[index % chartColors.length] }]} />
-                <Text style={styles.swatchText}>{option.text}</Text>
+                <Text style={[styles.swatchText, isMobile && { flex: 1, marginRight: 8, flexWrap: 'wrap' }]} numberOfLines={2}>
+                  {option.text}
+                </Text>
               </View>
               <TouchableOpacity 
-                style={styles.voteButton}
+                style={[styles.voteButton, isMobile && { minWidth: 70 }]}
                 onPress={() => vote(option.id)}
                 disabled={voteLoading}
               >
@@ -418,7 +452,7 @@ const PollView = () => {
   return (
     <View style={styles.container}>
       <FlatList
-        style={styles.pollListContainer}
+        style={[styles.pollListContainer, isMobile && { paddingHorizontal: 10 }]}
         data={filteredPolls}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderPoll}
@@ -528,6 +562,69 @@ const PollView = () => {
                 ? new Date(infoPoll.expiry.replace(" ", "T")).toLocaleString()
                 : "N/A"}
             </Text>
+            
+            {/* Vote statistics section */}
+            <View style={{ marginTop: 15, width: '100%' }}>
+              <Text style={[styles.infoTitle, { fontSize: 18, marginBottom: 10 }]}>
+                Vote Statistics
+              </Text>
+              
+              {infoPoll.options.length > 0 ? (
+                <>
+                  {/* Total votes count */}
+                  <Text style={[styles.infoDetail, { fontWeight: '500', marginBottom: 8 }]}>
+                    Total votes: {infoPoll.options.reduce((sum, opt) => sum + opt.votes, 0)}
+                  </Text>
+                  
+                  {/* Vote percentage breakdown */}
+                  {(() => {
+                    const totalVotes = infoPoll.options.reduce((sum, opt) => sum + opt.votes, 0);
+                    
+                    return infoPoll.options.map((option, index) => {
+                      const percentage = totalVotes > 0 
+                        ? Math.round((option.votes / totalVotes) * 100) 
+                        : 0;
+                        
+                      return (
+                        <View key={option.id} style={{
+                          flexDirection: 'column', // Changed to column for mobile
+                          marginBottom: 10,
+                          paddingVertical: 4,
+                          borderBottomWidth: index < infoPoll.options.length - 1 ? 1 : 0,
+                          borderBottomColor: '#eee'
+                        }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            <View style={[
+                              styles.swatchBox, 
+                              { backgroundColor: chartColors[index % chartColors.length] }
+                            ]} />
+                            <Text style={{ fontWeight: '500', marginLeft: 8, flex: 1 }} numberOfLines={2}>
+                              {option.text}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 4 }}>
+                            <View style={{
+                              height: 6,
+                              backgroundColor: chartColors[index % chartColors.length],
+                              width: `${Math.min(percentage, 60)}%`, // Limit width to prevent overflow
+                              borderRadius: 3,
+                              marginRight: 8
+                            }} />
+                            <Text style={{ fontSize: 13, color: '#555', flexShrink: 0 }}>
+                              {option.votes} vote{option.votes !== 1 ? 's' : ''} ({percentage}%)
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    });
+                  })()}
+                </>
+              ) : (
+                <Text style={{ color: '#666', fontStyle: 'italic' }}>
+                  No voting options available
+                </Text>
+              )}
+            </View>
           </View>
         </Animated.View>
       )}

@@ -111,11 +111,27 @@ const ClassChooser = () => {
       Alert.alert("Error", "User not logged in.");
       return;
     }
+
+    // Extract year number from selected year (e.g., "Year 1" -> 1)
+    // Set to null if user is a lecturer (role 3)
+    let yearNumber: number | null = null;
+    if (user.role !== 3) {
+      // Extract the number from strings like "Year 1", "Year 2", etc.
+      const yearMatch = selectedYear.match(/\d+/);
+      if (yearMatch) {
+        yearNumber = parseInt(yearMatch[0], 10);
+      }
+    }
+    
     try {
       const response = await fetch(`${SERVER_IP}/api/saveclasses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.user_id, classes: selectedClasses }),
+        body: JSON.stringify({ 
+          user_id: user.user_id, 
+          classes: selectedClasses,
+          year: yearNumber  // Include the year in the request
+        }),
       });
       const result = await response.json();
       if (response.ok) {

@@ -12,6 +12,7 @@ import { Buffer } from "buffer";
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSocket } from "./global";
+import { Ionicons } from "@expo/vector-icons";
 
 export const convertToBase64Uri = (pic: any): string => {
   if (!pic) return "";
@@ -453,6 +454,48 @@ const HomeScreen = () => {
             </Text>
           )}
         </View>
+        {/* Student Elections Section - updated for role 0 */}
+        <TouchableOpacity
+          onPress={() => router.push("/elections")}
+          style={{
+            backgroundColor: "#fff",
+            borderRadius: 12,
+            padding: 20,
+            marginBottom: 16,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 3,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Ionicons name="people" size={24} color="#FF9800" />
+            <Text style={{ fontSize: 20, fontWeight: "600", marginLeft: 12 }}>
+              Student Rep Elections
+            </Text>
+          </View>
+          <Text style={{ color: "#666", marginTop: 8, lineHeight: 20 }}>
+            {user && user.role === 0 
+              ? "Nominate yourself or vote for student representatives for your year."
+              : "Manage student representative elections and view results."}
+          </Text>
+          {user && user.role === 0 && (
+            <View style={{ 
+              backgroundColor: "#FFF8E1", 
+              padding: 10, 
+              borderRadius: 8, 
+              marginTop: 12,
+              flexDirection: "row",
+              alignItems: "center"
+            }}>
+              <Ionicons name="information-circle" size={20} color="#FF9800" style={{ marginRight: 8 }} />
+              <Text style={{ color: "#795548", flex: 1 }}>
+                Students can only run as representatives for their own year group.
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

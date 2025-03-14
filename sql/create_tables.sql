@@ -41,3 +41,42 @@ CREATE TABLE poll_options (
   vote_count INT DEFAULT 0,
   FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE
 );
+      CREATE TABLE IF NOT EXISTS election_votes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        election_id INT NOT NULL,
+        candidate_id INT NOT NULL,
+        voter_id INT NOT NULL,
+        voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE,
+        FOREIGN KEY (candidate_id) REFERENCES election_candidates(id) ON DELETE CASCADE,
+        FOREIGN KEY (voter_id) REFERENCES users(user_id),
+        UNIQUE KEY (election_id, voter_id)
+      )
+
+
+            CREATE TABLE IF NOT EXISTS election_candidates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        election_id INT NOT NULL,
+        user_id INT NOT NULL,
+        statement TEXT,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(user_id),
+        UNIQUE KEY (election_id, user_id)
+
+
+
+            )
+
+
+                  CREATE TABLE IF NOT EXISTS elections (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(100) NOT NULL,
+        description TEXT,
+        class_code VARCHAR(10) NOT NULL,
+        created_by INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_date DATETIME NOT NULL,
+        year_group INT NOT NULL,
+        FOREIGN KEY (created_by) REFERENCES users(user_id)
+      )

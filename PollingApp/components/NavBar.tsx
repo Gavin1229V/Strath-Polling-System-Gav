@@ -14,6 +14,12 @@ const NavBar = () => {
   const shouldHideNavBar = hideNavBarRoutes.includes(pathname);
   if (shouldHideNavBar) return null;
 
+  // Check if user is a student (role === 1)
+  const isStudent = userRole === 1;
+  
+  // Check if user is an instructor/admin (role !== 0 && role !== 1)
+  const isInstructor = userRole !== 0 && userRole !== 1;
+  
   const isActive = (route: string): boolean => pathname === route;
 
   return (
@@ -34,7 +40,7 @@ const NavBar = () => {
           </Text>
         </TouchableOpacity>
         
-        {userRole !== 1 && (
+        {isInstructor && (
           <TouchableOpacity 
             style={[styles.navButton, isActive("/pollCreator") && styles.activeNavButton]} 
             onPress={() => router.replace("/pollCreator")}
@@ -65,6 +71,24 @@ const NavBar = () => {
             Polls
           </Text>
         </TouchableOpacity>
+        
+        {/* Elections tab - only visible for students (role === 1) */}
+        {isStudent && (
+          <TouchableOpacity 
+            style={[styles.navButton, isActive("/elections") && styles.activeNavButton]} 
+            onPress={() => router.replace("/elections")}
+            accessibilityLabel="Student Elections"
+          >
+            <Ionicons 
+              name="people" 
+              size={24} 
+              color={isActive("/elections") ? "#007bff" : "#ffffff"} 
+            />
+            <Text style={[styles.navText, isActive("/elections") && styles.activeNavText]}>
+              Elections
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );

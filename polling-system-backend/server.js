@@ -12,6 +12,7 @@ const NodeCache = require("node-cache");
 
 const router = require("./pollRouter");
 const pollRouter = require("./pollRouter");
+const electionRouter = require("./electionRouter"); // Add this line
 const { getPolls, vote } = require("./polling");
 const { registerAndSendEmail, verifyEmail } = require("./register");
 const { loginUser } = require("./login");
@@ -87,6 +88,7 @@ app.use("/api", router);
 app.use("/api", verificationRouter);
 app.use("/api", require("./profilePicture"));
 app.use("/api/polls", pollRouter);
+app.use("/api/elections", electionRouter); // Add this line
 
 // Cached version of getPolls function
 const getCachedPolls = async () => {
@@ -249,6 +251,10 @@ io.on("connection", async (socket) => {
     // Implement vote throttling
     if (voteThrottle[optionId] && now - voteThrottle[optionId] < 2000) {
       console.log(`[THROTTLE] Rejecting rapid vote for option ${optionId}`);
+      socket.emit("voteResponse", { 
+        success: false, 
+        message: "Please wait before voting again" 
+      });
       return;
     }
     voteThrottle[optionId] = now;
@@ -260,9 +266,18 @@ io.on("connection", async (socket) => {
       invalidatePollCache();
       const polls = await getCachedPolls();
       io.emit("pollsUpdated", polls);
+      // Send success response back to the voting client
+      socket.emit("voteResponse", { 
+        success: true, 
+        message: "Vote registered successfully",
+        optionId: optionId
+      });
     } catch (error) {
       console.error("[ERROR] Error processing vote:", error);
-      socket.emit("error", { message: "Failed to process vote" });
+      socket.emit("voteResponse", { 
+        success: false,
+        message: "Failed to process your vote. Please try again."
+      });
     }
   });
 });

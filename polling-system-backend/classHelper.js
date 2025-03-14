@@ -1,12 +1,12 @@
 const { getConnection } = require("./db");
 
-const updateUserClasses = async (userId, classesArray) => {
+const updateUserClasses = async (userId, classesArray, year) => {
   const connection = await getConnection();
   // Convert array of classes to a comma-separated string
   const classesStr = classesArray.join(",");
-  // Update the classes column in the 'users' table, not in logins
-  const sql = `UPDATE users SET classes = ? WHERE user_id = ?`;
-  await connection.query(sql, [classesStr, userId]);
+  // Update both the classes and year columns in the 'users' table
+  const sql = `UPDATE users SET classes = ?, year_group = ? WHERE user_id = ?`;
+  await connection.query(sql, [classesStr, year, userId]);
 };
 
 module.exports = { updateUserClasses };
