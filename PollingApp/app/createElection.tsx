@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { useAuth, useUserClasses } from "./userDetails";
+import { useAuth } from "./userDetails";
 import { SERVER_IP } from "./config";
 import styles from "../styles/styles";
 
@@ -26,16 +26,13 @@ const getDefaultEndDate = () => {
 const CreateElectionScreen = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [classCode, setClassCode] = useState("");
   const [yearGroup, setYearGroup] = useState<number>(1);
   const [endDate, setEndDate] = useState(getDefaultEndDate());
-  const [showClassPicker, setShowClassPicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
   const { user } = useAuth();
-  const userClasses = useUserClasses();
   const router = useRouter();
 
   // Format date for display
@@ -48,7 +45,7 @@ const CreateElectionScreen = () => {
 
   // Check for form validity
   const isFormValid = () => {
-    return title.trim() !== "" && classCode !== "" && yearGroup > 0;
+    return title.trim() !== "" && yearGroup > 0;
   };
 
   // Create the election
@@ -75,9 +72,9 @@ const CreateElectionScreen = () => {
         body: JSON.stringify({
           title,
           description,
-          class_code: classCode,
           year_group: yearGroup,
           end_date: endDate.toISOString().slice(0, 19).replace("T", " "), // Format: YYYY-MM-DD HH:MM:SS
+          userId: user.user_id,
         }),
       });
 
@@ -112,6 +109,23 @@ const CreateElectionScreen = () => {
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <Text style={styles.electionHeader}>Create Student Representative Election</Text>
         
+        {/* Lecturer info card */}
+        <View style={{
+          backgroundColor: "#E3F2FD", 
+          padding: 16, 
+          borderRadius: 8, 
+          marginBottom: 20,
+          marginHorizontal: 16,
+          flexDirection: "row",
+          alignItems: "center"
+        }}>
+          <Ionicons name="information-circle" size={24} color="#1976D2" style={{ marginRight: 10 }} />
+          <Text style={{ color: "#1976D2", flex: 1 }}>
+            As a lecturer, you can create elections for specific year groups. 
+            Students will only be able to nominate themselves or vote in elections for their own year group.
+          </Text>
+        </View>
+        
         <View style={styles.electionForm}>
           {/* Election Title */}
           <Text style={styles.formLabel}>
@@ -136,50 +150,31 @@ const CreateElectionScreen = () => {
             numberOfLines={5}
           />
           
-          {/* Class Code Selection */}
-          <Text style={styles.formLabel}>
-            Class Code <Text style={{ color: "#e53935" }}>*</Text>
-          </Text>
-          <TouchableOpacity
-            style={{
-              borderWidth: 1,
-              borderColor: "#ddd",
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 16,
-              backgroundColor: "#fafafa",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-            onPress={() => setShowClassPicker(true)}
-          >
-            <Text style={{ color: classCode ? "#333" : "#999" }}>
-              {classCode || "Select class code"}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="#666" />
-          </TouchableOpacity>
-          
           {/* Year Group Selection */}
-          <Text style={styles.formLabel}>
+          <Text style={[styles.formLabel, { fontSize: 18, fontWeight: "700", marginTop: 10 }]}>
             Year Group <Text style={{ color: "#e53935" }}>*</Text>
           </Text>
+          <Text style={{ marginBottom: 10, color: "#666", fontStyle: "italic" }}>
+            Select which year group can participate in this election
+          </Text>
           <TouchableOpacity
             style={{
               borderWidth: 1,
-              borderColor: "#ddd",
+              borderColor: "#1976D2",
               borderRadius: 8,
               padding: 12,
               marginBottom: 16,
-              backgroundColor: "#fafafa",
+              backgroundColor: "#E3F2FD",
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
             }}
             onPress={() => setShowYearPicker(true)}
           >
-            <Text>Year {yearGroup}</Text>
-            <Ionicons name="chevron-down" size={20} color="#666" />
+            <Text style={{ fontSize: 16, fontWeight: "600", color: "#1976D2" }}>
+              Year {yearGroup}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#1976D2" />
           </TouchableOpacity>
 
           {/* End Date Selection */}
@@ -219,61 +214,6 @@ const CreateElectionScreen = () => {
             )}
           </TouchableOpacity>
         </View>
-
-        {/* Class Picker Modal */}
-        {showClassPicker && (
-          <View
-            style={{
-              position: "absolute",
-              top: "30%",
-              left: 20,
-              right: 20,
-              backgroundColor: "#fff",
-              borderRadius: 8,
-              padding: 16,
-              maxHeight: "50%",
-              elevation: 5,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 3.84,
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 16 }}>
-              Select Class Code
-            </Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              {userClasses.map((cls) => (
-                <TouchableOpacity
-                  key={cls}
-                  style={{
-                    paddingVertical: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#eee",
-                  }}
-                  onPress={() => {
-                    setClassCode(cls);
-                    setShowClassPicker(false);
-                  }}
-                >
-                  <Text style={{ fontSize: 16 }}>{cls}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={{
-                marginTop: 16,
-                padding: 12,
-                backgroundColor: "#f5f5f5",
-                borderRadius: 8,
-                alignItems: "center",
-              }}
-              onPress={() => setShowClassPicker(false)}
-            >
-              <Text style={{ color: "#666", fontWeight: "600" }}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         {/* Year Group Picker Modal */}
         {showYearPicker && (

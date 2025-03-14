@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useAuth } from "./userDetails";
+import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "./userDetails";
 import { SERVER_IP } from "./config";
 import styles from "../styles/styles";
 
@@ -21,8 +21,7 @@ interface Candidate {
   user_id: number;
   statement: string;
   applied_at: string;
-  first_name: string;
-  last_name: string;
+  email: string;  // Changed from first_name/last_name to email
   profile_picture: string | null;
   vote_count: number;
   year_group?: number;
@@ -54,9 +53,6 @@ const ElectionDetailScreen = () => {
   const { user } = useAuth();
   const router = useRouter();
   
-  // Check if user is a student (role === 1)
-  const isStudent = user && user.role === 1;
-  
   // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -66,16 +62,9 @@ const ElectionDetailScreen = () => {
     });
   };
   
-  // Check if election is still open
-  const isElectionOpen = () => {
-    return election && new Date(election.end_date) > new Date();
-  };
-
-  // Check if current user can apply (based on year group and being a student with role 1)
+  // Check if current user can apply (based only on year group match)
   const canApplyAsCandidate = () => {
     return (
-      isStudent &&
-      isElectionOpen() &&
       !hasApplied &&
       userYearGroup !== null &&
       election?.year_group === userYearGroup
@@ -102,6 +91,42 @@ const ElectionDetailScreen = () => {
     }
   };
   
+  // Fetch user's voting status immediately when user data is available
+  useEffect(() => {
+    if (user && id) {
+      checkUserVoteStatus();
+    }
+  }, [user, id]);
+  
+  // Separate function to check if user has already voted
+  const checkUserVoteStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const voteResponse = await fetch(
+        `${SERVER_IP}/api/elections/${id}/hasVoted?userId=${user.user_id}`, {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+      
+      if (voteResponse.ok) {
+        const voteData = await voteResponse.json();
+        if (voteData.hasVoted) {
+          console.log("User has already voted for candidate:", voteData.candidateId);
+          setVotedFor(voteData.candidateId);
+        } else {
+          console.log("User has not voted yet");
+        }
+      } else {
+        console.error("Failed to check vote status:", await voteResponse.text());
+      }
+    } catch (error) {
+      console.error("Error checking vote status:", error);
+    }
+  };
+  
   // Fetch election details
   const fetchElectionDetails = async () => {
     setLoading(true);
@@ -119,28 +144,6 @@ const ElectionDetailScreen = () => {
         const userCandidate: Candidate | undefined = data.candidates.find((c: Candidate) => c.user_id === user.user_id);
         setHasApplied(Boolean(userCandidate));
       }
-      
-      // Check if user has voted
-      if (user) {
-        try {
-          const voteResponse = await fetch(
-            `${SERVER_IP}/api/elections/${id}/hasVoted`, {
-              headers: {
-                Authorization: `Bearer ${user.token}`,
-              },
-            }
-          );
-          
-          if (voteResponse.ok) {
-            const voteData = await voteResponse.json();
-            if (voteData.hasVoted) {
-              setVotedFor(voteData.candidateId);
-            }
-          }
-        } catch (error) {
-          console.error("Error checking vote status:", error);
-        }
-      }
     } catch (error) {
       console.error("Error fetching election details:", error);
       Alert.alert("Error", "Failed to load election details. Please try again later.");
@@ -149,7 +152,7 @@ const ElectionDetailScreen = () => {
     }
   };
   
-  // Initial data fetch
+  // Initial data fetch - now we don't check vote status here since it's in its own effect
   useEffect(() => {
     if (id) {
       fetchElectionDetails();
@@ -178,6 +181,7 @@ const ElectionDetailScreen = () => {
         },
         body: JSON.stringify({
           candidateId,
+          userId: user.user_id
         }),
       });
       
@@ -186,23 +190,18 @@ const ElectionDetailScreen = () => {
         throw new Error(errorData.error || "Failed to vote");
       }
       
-      setVotedFor(candidateId);
-      fetchElectionDetails(); // Refresh data
+      setVotedFor(candidateId); // This now correctly marks that the user has voted
+      // No need to call fetchElectionDetails here, just update the vote count locally
       Alert.alert("Success", "Your vote has been recorded.");
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to record your vote. Please try again.");
     }
   };
   
-  // Apply as a candidate - only for students (role === 1)
+  // Apply as a candidate - no longer checks for student roles
   const applyAsCandidate = async () => {
     if (!user) {
       Alert.alert("Error", "You must be logged in to apply.");
-      return;
-    }
-    
-    if (!isStudent) {
-      Alert.alert("Error", "Only students can apply as candidates.");
       return;
     }
     
@@ -227,6 +226,7 @@ const ElectionDetailScreen = () => {
         },
         body: JSON.stringify({
           statement: candidateStatement,
+          userId: user.user_id
         }),
       });
       
@@ -247,6 +247,28 @@ const ElectionDetailScreen = () => {
     }
   };
   
+  // Helper function to get display name from candidate
+  const getCandidateName = (candidate: Candidate) => {
+    if (candidate.email) {
+      const firstName = getFirstNameFromEmail(candidate.email);
+      const lastName = getLastNameFromEmail(candidate.email);
+      return `${firstName} ${lastName}`;
+    } else {
+      return "Unknown Candidate";
+    }
+  };
+  
+  // Get candidate initials for avatar
+  const getCandidateInitials = (candidate: Candidate) => {
+    if (candidate.email) {
+      const firstName = getFirstNameFromEmail(candidate.email);
+      const lastName = getLastNameFromEmail(candidate.email);
+      return `${firstName[0]}${lastName[0]}`;
+    } else {
+      return "UC";
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -293,17 +315,6 @@ const ElectionDetailScreen = () => {
                 {election.candidates.length} candidate{election.candidates.length !== 1 ? "s" : ""}
               </Text>
             </View>
-            
-            <Text
-              style={[
-                styles.electionStatus,
-                isElectionOpen()
-                  ? styles.electionStatusOpen
-                  : styles.electionStatusClosed,
-              ]}
-            >
-              {isElectionOpen() ? "OPEN" : "CLOSED"}
-            </Text>
           </View>
         </View>
         
@@ -321,14 +332,14 @@ const ElectionDetailScreen = () => {
                 ) : (
                   <View style={[styles.candidateAvatar, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
                     <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#555' }}>
-                      {candidate.first_name?.[0]}{candidate.last_name?.[0]}
+                      {getCandidateInitials(candidate)}
                     </Text>
                   </View>
                 )}
                 
                 <View style={styles.candidateInfo}>
                   <Text style={styles.candidateName}>
-                    {candidate.first_name} {candidate.last_name}
+                    {getCandidateName(candidate)}
                   </Text>
                   
                   <Text style={styles.candidateStatement}>{candidate.statement}</Text>
@@ -338,7 +349,8 @@ const ElectionDetailScreen = () => {
                   </Text>
                 </View>
                 
-                {isElectionOpen() && isStudent && votedFor === null && (
+                {/* Show vote button only if user hasn't voted for anyone yet */}
+                {votedFor === null && (
                   <TouchableOpacity
                     style={styles.voteButton}
                     onPress={() => voteForCandidate(candidate.id)}
@@ -347,6 +359,7 @@ const ElectionDetailScreen = () => {
                   </TouchableOpacity>
                 )}
                 
+                {/* Show voted badge only for the candidate the user voted for */}
                 {votedFor === candidate.id && (
                   <View style={styles.votedBadge}>
                     <Text style={styles.votedText}>Voted</Text>
@@ -361,8 +374,8 @@ const ElectionDetailScreen = () => {
           )}
         </View>
         
-        {/* Apply as candidate button */}
-        {isStudent && isElectionOpen() && !hasApplied && (
+        {/* Apply as candidate button - no longer checks role or if election is open */}
+        {!hasApplied && (
           <View style={{ marginTop: 20, marginBottom: 40 }}>
             {!showApplyForm ? (
               <TouchableOpacity
@@ -439,7 +452,7 @@ const ElectionDetailScreen = () => {
         )}
         
         {/* If the user has already applied, show a message */}
-        {isStudent && isElectionOpen() && hasApplied && (
+        {hasApplied && (
           <View style={{ 
             backgroundColor: "#e8f5e9",
             padding: 16,
@@ -451,23 +464,6 @@ const ElectionDetailScreen = () => {
             <Ionicons name="checkmark-circle-outline" size={32} color="#2e7d32" />
             <Text style={{ color: "#2e7d32", fontWeight: "600", marginTop: 8 }}>
               You have already applied as a candidate
-            </Text>
-          </View>
-        )}
-        
-        {/* If election is closed, show a message */}
-        {!isElectionOpen() && (
-          <View style={{ 
-            backgroundColor: "#ffebee",
-            padding: 16,
-            borderRadius: 8,
-            marginTop: 20,
-            marginBottom: 40,
-            alignItems: "center"
-          }}>
-            <Ionicons name="time-outline" size={32} color="#c62828" />
-            <Text style={{ color: "#c62828", fontWeight: "600", marginTop: 8 }}>
-              This election is now closed
             </Text>
           </View>
         )}

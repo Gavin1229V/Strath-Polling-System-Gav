@@ -83,6 +83,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// Debug middleware for elections API
+app.use((req, res, next) => {
+  if (req.url.includes('/api/elections')) {
+    console.log(`[DEBUG] Elections API request: ${req.method} ${req.url}`);
+  }
+  next();
+});
+
 // Mount additional routers
 app.use("/api", router);
 app.use("/api", verificationRouter);

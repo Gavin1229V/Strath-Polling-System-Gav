@@ -208,3 +208,5 @@ export const fetchPolls = async (
   
   throw new Error("Failed to fetch polls after maximum retries");
 };
+
+export default{}

@@ -5,8 +5,6 @@ const getAccountDetails = async (userId) => {
   // Updated query: fetch details from new "users" table, which stores classes and profile_picture
   const [rows] = await connection.query("SELECT * FROM users WHERE user_id = ?", [userId]);
   
-  // Replace full object logging with a cleaner version that excludes binary data
-  console.log(`[INFO] Retrieved account details for user_id: ${userId}, found ${rows.length} record(s)`);
 
   
   return rows;

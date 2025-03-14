@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useAuth, useUserClasses } from "./userDetails";
+import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "./userDetails";
 import { SERVER_IP } from "./config";
 import styles from "../styles/styles";
 
@@ -18,22 +18,20 @@ interface Election {
   id: number;
   title: string;
   description: string;
-  class_code: string;
   created_at: string;
   end_date: string;
   candidate_count: number;
-  creator_first_name?: string;
-  creator_last_name?: string;
+  creator_email?: string; // Changed to email instead of first_name/last_name
+  year_group: number;
 }
 
 const ElectionsScreen = () => {
   const [elections, setElections] = useState<Election[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [activeYearFilter, setActiveYearFilter] = useState<number | null>(null);
   
   const { user } = useAuth();
-  const userClasses = useUserClasses();
   const router = useRouter();
 
   // Check if user has the student role (using role === 1)
@@ -87,17 +85,20 @@ const ElectionsScreen = () => {
     fetchElections(true);
   };
   
-  // Filter elections by class
-  const filteredElections = activeFilter === "All"
+  // Filter elections by year group if filter is active
+  const filteredElections = activeYearFilter === null
     ? elections
-    : elections.filter(election => election.class_code === activeFilter);
+    : elections.filter(election => election.year_group === activeYearFilter);
+  
+  // Year groups for filtering (for lecturers)
+  const yearGroups = [1, 2, 3, 4, 5];
 
   // Navigate to election details
   const viewElection = (election: Election) => {
     router.push(`/electionDetail?id=${election.id}`);
   };
 
-  // Create a new election - now only shown to students (role === 0)
+  // Create a new election
   const createElection = () => {
     router.push("/createElection");
   };
@@ -115,49 +116,51 @@ const ElectionsScreen = () => {
     <View style={styles.electionContainer}>
       <Text style={styles.electionHeader}>Student Representative Elections</Text>
       
-      {/* Filter by class */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterScrollView}
-      >
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            activeFilter === "All" && styles.activeFilterButton,
-          ]}
-          onPress={() => setActiveFilter("All")}
+      {/* Year filter - only for lecturers */}
+      {isLecturer && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScrollView}
         >
-          <Text
-            style={[
-              styles.filterButtonText,
-              activeFilter === "All" && styles.activeFilterText,
-            ]}
-          >
-            All
-          </Text>
-        </TouchableOpacity>
-        
-        {userClasses.map((cls) => (
           <TouchableOpacity
-            key={cls}
             style={[
               styles.filterButton,
-              activeFilter === cls && styles.activeFilterButton,
+              activeYearFilter === null && styles.activeFilterButton,
             ]}
-            onPress={() => setActiveFilter(cls)}
+            onPress={() => setActiveYearFilter(null)}
           >
             <Text
               style={[
                 styles.filterButtonText,
-                activeFilter === cls && styles.activeFilterText,
+                activeYearFilter === null && styles.activeFilterText,
               ]}
             >
-              {cls}
+              All Years
             </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          
+          {yearGroups.map((year) => (
+            <TouchableOpacity
+              key={year}
+              style={[
+                styles.filterButton,
+                activeYearFilter === year && styles.activeFilterButton,
+              ]}
+              onPress={() => setActiveYearFilter(year)}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  activeYearFilter === year && styles.activeFilterText,
+                ]}
+              >
+                Year {year}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
       
       <ScrollView
         refreshControl={
@@ -172,17 +175,32 @@ const ElectionsScreen = () => {
               style={styles.electionCard}
               onPress={() => viewElection(election)}
             >
-              <Text style={styles.electionTitle}>{election.title}</Text>
-              
-              <View style={styles.electionDetail}>
-                <Ionicons name="school-outline" size={16} color="#666" style={{ marginRight: 6 }} />
-                <Text>{election.class_code}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.electionTitle}>{election.title}</Text>
+                <View style={{ 
+                  backgroundColor: '#E3F2FD', 
+                  paddingVertical: 4, 
+                  paddingHorizontal: 10, 
+                  borderRadius: 12
+                }}>
+                  <Text style={{ color: '#1976D2', fontWeight: '600' }}>
+                    Year {election.year_group}
+                  </Text>
+                </View>
               </View>
               
               <View style={styles.electionDetail}>
                 <Ionicons name="calendar-outline" size={16} color="#666" style={{ marginRight: 6 }} />
                 <Text>Ends: {formatDate(election.end_date)}</Text>
               </View>
+              
+              {/* Show creator info using email parsing */}
+              {election.creator_email && (
+                <View style={styles.electionDetail}>
+                  <Ionicons name="person-outline" size={16} color="#666" style={{ marginRight: 6 }} />
+                  <Text>Created by: {getFirstNameFromEmail(election.creator_email)} {getLastNameFromEmail(election.creator_email)}</Text>
+                </View>
+              )}
               
               <View style={styles.electionMetaContainer}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -209,7 +227,9 @@ const ElectionsScreen = () => {
           <View style={styles.emptyContainer}>
             <Ionicons name="information-circle-outline" size={40} color="#999" />
             <Text style={{ marginTop: 8, color: "#666", textAlign: "center" }}>
-              No elections found for your selected filter.
+              {activeYearFilter !== null ? 
+                `No elections found for Year ${activeYearFilter}.` : 
+                "No elections found."}
             </Text>
           </View>
         )}

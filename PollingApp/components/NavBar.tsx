@@ -17,8 +17,14 @@ const NavBar = () => {
   // Check if user is a student (role === 1)
   const isStudent = userRole === 1;
   
-  // Check if user is an instructor/admin (role !== 0 && role !== 1)
-  const isInstructor = userRole !== 0 && userRole !== 1;
+  // Check if user is a student rep (role === 2)
+  const isStudentRep = userRole === 2;
+  
+  // Check if user is a lecturer (role === 3)
+  const isLecturer = userRole === 3;
+  
+  // Check if user is an instructor (specifically role === 3)
+  const isInstructor = userRole === 3;
   
   const isActive = (route: string): boolean => pathname === route;
 
@@ -72,8 +78,8 @@ const NavBar = () => {
           </Text>
         </TouchableOpacity>
         
-        {/* Elections tab - only visible for students (role === 1) */}
-        {isStudent && (
+        {/* Elections tab - visible for students (role === 1), student reps (role === 2) and lecturers (role === 3) */}
+        {(isStudent || isStudentRep || isLecturer) && (
           <TouchableOpacity 
             style={[styles.navButton, isActive("/elections") && styles.activeNavButton]} 
             onPress={() => router.replace("/elections")}

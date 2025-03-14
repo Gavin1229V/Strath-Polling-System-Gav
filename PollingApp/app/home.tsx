@@ -454,13 +454,15 @@ const HomeScreen = () => {
             </Text>
           )}
         </View>
-        {/* Student Elections Section - updated for role 0 */}
+        {/* Student Elections Section - updated for roles */}
         <TouchableOpacity
           onPress={() => router.push("/elections")}
           style={{
             backgroundColor: "#fff",
             borderRadius: 12,
             padding: 20,
+            marginHorizontal: 20,
+            marginTop: 20,
             marginBottom: 16,
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
@@ -476,11 +478,13 @@ const HomeScreen = () => {
             </Text>
           </View>
           <Text style={{ color: "#666", marginTop: 8, lineHeight: 20 }}>
-            {user && user.role === 0 
+            {user && user.role === 1 
               ? "Nominate yourself or vote for student representatives for your year."
-              : "Manage student representative elections and view results."}
+              : user && user.role === 2
+                ? "View and participate in student representative elections."
+                : "Manage student representative elections and view results."}
           </Text>
-          {user && user.role === 0 && (
+          {user && user.role === 1 && (
             <View style={{ 
               backgroundColor: "#FFF8E1", 
               padding: 10, 
@@ -493,6 +497,42 @@ const HomeScreen = () => {
               <Text style={{ color: "#795548", flex: 1 }}>
                 Students can only run as representatives for their own year group.
               </Text>
+            </View>
+          )}
+          {user && user.role === 3 && (
+            <View style={{ marginTop: 12 }}>
+              <View style={{ 
+                backgroundColor: "#E8F5E9", 
+                padding: 10, 
+                borderRadius: 8, 
+                marginBottom: 12,
+                flexDirection: "row",
+                alignItems: "center"
+              }}>
+                <Ionicons name="create" size={20} color="#4CAF50" style={{ marginRight: 8 }} />
+                <Text style={{ color: "#2E7D32", flex: 1 }}>
+                  As a lecturer, you can create elections for specific year groups.
+                </Text>
+              </View>
+              
+              <TouchableOpacity
+                onPress={() => router.push("/createElection")}
+                style={{
+                  backgroundColor: "#4CAF50",
+                  padding: 12,
+                  borderRadius: 8,
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  alignItems: "center"
+                }}
+                accessibilityLabel="Create Election"
+                accessibilityRole="button"
+              >
+                <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                  Create New Election
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </TouchableOpacity>

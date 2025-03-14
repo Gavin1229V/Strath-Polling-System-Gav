@@ -88,6 +88,28 @@ function InnerLayout() {
               headerBackVisible: true,
             }}
           />
+          <Stack.Screen
+            name="elections"
+            options={{
+              title: "Student Elections",
+              headerBackVisible: false,
+              headerLeft: () => null,
+            }}
+          />
+          <Stack.Screen
+            name="electionDetail"
+            options={{
+              title: "Election Details",
+              headerBackVisible: true,
+            }}
+          />
+          <Stack.Screen
+            name="createElection"
+            options={{
+              title: "Create Election",
+              headerBackVisible: true,
+            }}
+          />
         </Stack>
       </View>
       <NavBar />

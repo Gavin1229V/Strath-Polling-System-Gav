@@ -81,10 +81,7 @@ export const useUserRole = () => {
 export const useFirstName = () => {
   const { user } = useAuth();
   if (user && user.email) {
-    const parts = user.email.split(".");
-    if (parts[0]) {
-      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-    }
+    return getFirstNameFromEmail(user.email);
   }
   return "";
 };
@@ -92,10 +89,26 @@ export const useFirstName = () => {
 export const useLastName = () => {
   const { user } = useAuth();
   if (user && user.email) {
-    const parts = user.email.split(".");
-    if (parts.length > 1 && parts[1]) {
-      return parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
-    }
+    return getLastNameFromEmail(user.email);
+  }
+  return "";
+};
+
+// Utility functions for extracting names from any email
+export const getFirstNameFromEmail = (email: string): string => {
+  const parts = email.split(".");
+  if (parts[0]) {
+    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+  }
+  return "";
+};
+
+export const getLastNameFromEmail = (email: string): string => {
+  const parts = email.split(".");
+  if (parts.length > 1 && parts[1]) {
+    // Extract the part before @ if present
+    const lastNamePart = parts[1].split("@")[0];
+    return lastNamePart.charAt(0).toUpperCase() + lastNamePart.slice(1);
   }
   return "";
 };

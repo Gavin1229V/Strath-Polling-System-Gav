@@ -10,8 +10,7 @@ router.get("/", async (req, res) => {
     const [elections] = await connection.query(`
       SELECT e.*, 
         COUNT(c.id) AS candidate_count,
-        u.first_name AS creator_first_name,
-        u.last_name AS creator_last_name,
+        u.email AS creator_email,
         e.year_group
       FROM elections e
       LEFT JOIN election_candidates c ON e.id = c.election_id
@@ -42,7 +41,7 @@ router.get("/:id", async (req, res) => {
     const election = elections[0];
     
     const [candidates] = await connection.query(`
-      SELECT c.*, u.first_name, u.last_name, u.profile_picture, u.year_group,
+      SELECT c.*, u.email, u.profile_picture, u.year_group,
         COUNT(v.id) AS vote_count
       FROM election_candidates c
       JOIN users u ON c.user_id = u.user_id
@@ -69,30 +68,82 @@ router.get("/:id", async (req, res) => {
 
 // Create a new election
 router.post("/", async (req, res) => {
-  // For lecturer check, we'll need to get the user information from the request
-  // This assumes user information is passed in the request body
-  const { title, description, class_code, end_date, year_group, userId, userRole } = req.body;
-  
-  // Check if the user is a lecturer (role !== 0)
-  if (userRole === 0) {
-    return res.status(403).json({ error: "Only lecturers can create elections" });
-  }
-  
-  if (!title || !class_code || !end_date || !year_group || !userId) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
+  console.log("[INFO] Creating new election:", req.body);
   
   try {
-    const connection = await getConnection();
-    const [result] = await connection.query(`
-      INSERT INTO elections (title, description, class_code, created_by, end_date, year_group)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [title, description, class_code, userId, end_date, year_group]);
+    // Extract user information from the request body
+    const { title, description, end_date, year_group, userId } = req.body;
     
+    // Validate all required fields
+    if (!title) {
+      return res.status(400).json({ error: "Election title is required" });
+    }
+    
+    if (!end_date) {
+      return res.status(400).json({ error: "End date is required" });
+    }
+    
+    if (!year_group) {
+      return res.status(400).json({ error: "Year group is required" });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    const connection = await getConnection();
+    
+    // Only verify the user exists (removed role check)
+    const [userCheck] = await connection.query(
+      "SELECT * FROM users WHERE user_id = ?",
+      [userId]
+    );
+    
+    if (userCheck.length === 0) {
+      return res.status(403).json({ error: "User not found" });
+    }
+    
+    // Validate that the year group is between 1 and 5
+    if (year_group < 1 || year_group > 5) {
+      return res.status(400).json({ error: "Year group must be between 1 and 5" });
+    }
+    
+    // Format the end date properly for MySQL
+    let formattedEndDate;
+    try {
+      // Try to format the date for MySQL (YYYY-MM-DD HH:MM:SS)
+      const endDate = new Date(end_date);
+      formattedEndDate = endDate.toISOString().slice(0, 19).replace('T', ' ');
+      console.log("[INFO] Formatted end date:", formattedEndDate);
+    } catch (dateError) {
+      console.error("[ERROR] Invalid date format:", dateError);
+      return res.status(400).json({ error: "Invalid date format" });
+    }
+    
+    console.log("[INFO] Inserting election with values:", {
+      title,
+      description: description || null,
+      created_by: userId,
+      end_date: formattedEndDate,
+      year_group
+    });
+    
+    const [result] = await connection.query(
+      `INSERT INTO elections (title, description, created_by, end_date, year_group)
+       VALUES (?, ?, ?, ?, ?)`,
+      [title, description || null, userId, formattedEndDate, year_group]
+    );
+    
+    console.log("[INFO] Election created successfully with ID:", result.insertId);
     res.status(201).json({ id: result.insertId });
   } catch (error) {
-    console.error("Error creating election:", error);
-    res.status(500).json({ error: error.message });
+    console.error("[ERROR] Error creating election:", error);
+    // Send detailed error for debugging
+    res.status(500).json({ 
+      error: "Failed to create election",
+      details: error.message,
+      code: error.code 
+    });
   }
 });
 
@@ -213,23 +264,25 @@ router.post("/:id/votes", async (req, res) => {
   }
 });
 
-// Get elections by class code
-router.get("/class/:code", async (req, res) => {
+// Add a new endpoint to get elections by year group
+router.get("/year/:yearGroup", async (req, res) => {
   try {
     const connection = await getConnection();
     const [elections] = await connection.query(`
       SELECT e.*, 
-        COUNT(c.id) AS candidate_count
+        COUNT(c.id) AS candidate_count,
+        u.email AS creator_email
       FROM elections e
       LEFT JOIN election_candidates c ON e.id = c.election_id
-      WHERE e.class_code = ?
+      LEFT JOIN users u ON e.created_by = u.user_id
+      WHERE e.year_group = ?
       GROUP BY e.id
       ORDER BY e.end_date DESC
-    `, [req.params.code]);
+    `, [req.params.yearGroup]);
     
     res.json(elections);
   } catch (error) {
-    console.error("Error fetching elections by class:", error);
+    console.error("Error fetching elections by year group:", error);
     res.status(500).json({ error: error.message });
   }
 });
