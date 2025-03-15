@@ -43,15 +43,12 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
   useEffect(() => {
     if (voterIds.length === 0) return;
     
-    console.log(`[DEBUG] VotersList getting data for poll ${pollId} with ${voterIds.length} voters:`, voterIds);
-    
     const fetchVoters = async () => {
       setLoadingVoters(true);
       setError(null);
       try {
         // Ensure we're only sending valid, non-empty values
         const validVoterIds = voterIds.filter(id => id && id.trim());
-        console.log(`[DEBUG] Sending ${validVoterIds.length} valid voterIds:`, validVoterIds);
         
         const response = await fetch(`${SERVER_IP}/api/users/batch`, {
           method: 'POST',
@@ -63,26 +60,24 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
         
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`[ERROR] Failed to fetch voter info (${response.status}):`, errorText);
+          console.error(`Failed to fetch voter info (${response.status}):`, errorText);
           setError(`Server error: ${response.status}`);
           setVoters([]);
           return;
         }
         
         const responseText = await response.text();
-        console.log(`[DEBUG] Raw voter response:`, responseText);
         
         try {
           const data = JSON.parse(responseText);
-          console.log(`[DEBUG] Parsed ${data.length} voters:`, data);
           setVoters(data);
         } catch (parseError) {
-          console.error("[ERROR] JSON parse error:", parseError);
+          console.error("JSON parse error:", parseError);
           setError("Failed to parse server response");
           setVoters([]);
         }
       } catch (error) {
-        console.error("[ERROR] Fetch error:", error);
+        console.error("Fetch error:", error);
         setError("Network error");
         setVoters([]);
       } finally {
@@ -595,7 +590,6 @@ const PollView = () => {
     // Collect all voter IDs from each option
     poll.options.forEach(option => {
       if (option.voters) {
-        console.log(`[DEBUG] Option ${option.id} has voters: ${option.voters}`);
         const voterIds = option.voters.split(',').filter(id => id && id.trim());
         voterIds.forEach(id => {
           voterIdsMap[id] = true;
@@ -605,7 +599,6 @@ const PollView = () => {
     
     // Convert to array and filter out empty strings
     const uniqueVoterIds = Object.keys(voterIdsMap).filter(id => id && id.trim());
-    console.log(`[DEBUG] Found ${uniqueVoterIds.length} unique voters for poll ${poll.id}:`, uniqueVoterIds);
     
     return uniqueVoterIds;
   };
