@@ -6,6 +6,8 @@ export type PollOption = {
     id: number;
     text: string;
     votes: number;
+    voters: string; // Comma-separated list of voter IDs
+    index: number; // Adding index property that exists in the backend
 };
 
 /**
@@ -20,7 +22,12 @@ export type Poll = {
     expiry: string;     // Datetime string for poll expiration
     options: PollOption[];
     created_by_id?: number;
-    profile_picture?: string;  // Base64 encoded or URL to profile picture
+    profile_picture?: string | null;  // Base64 encoded or URL to profile picture
+    voters?: {          // Added voters array for aggregated voter info
+        id: number | string;
+        username?: string;
+        profile_picture?: string;
+    }[];
 };
 
 // Add a simple cache for polls with expiration
@@ -297,5 +304,14 @@ export const convertToBase64Uri = (pic: any): string => {
   }
   return "";
 };
+
+// Update the VoterInfo interface
+interface VoterInfo {
+  user_id: number | string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  profile_picture?: string | null;
+}
 
 export default{}

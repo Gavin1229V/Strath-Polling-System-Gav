@@ -39,6 +39,7 @@ CREATE TABLE poll_options (
   option_index INT NOT NULL, -- Order of options
   option_text VARCHAR(255) NOT NULL,
   vote_count INT DEFAULT 0,
+  voters mediumtext
   FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE
 );
       CREATE TABLE IF NOT EXISTS election_votes (

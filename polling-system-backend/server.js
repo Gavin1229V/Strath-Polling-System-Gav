@@ -197,6 +197,77 @@ app.get("/accountDetails", async (req, res) => {
   }
 });
 
+// Update batch user info endpoint to match the database schema
+app.post("/api/users/batch", async (req, res) => {
+  const { userIds } = req.body;
+  
+  if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+    console.log("[ERROR] Invalid userIds provided:", userIds);
+    return res.status(400).json({ message: "Valid userIds array is required" });
+  }
+  
+  try {
+    const connection = await getConnection();
+    
+    console.log("[DEBUG] Looking up voter IDs:", userIds);
+    
+    // Handle single ID case separately (MySQL parameter formatting issue)
+    let query, params;
+    if (userIds.length === 1) {
+      query = `SELECT user_id, email, profile_picture 
+               FROM users 
+               WHERE user_id = ?`;
+      params = [userIds[0]];
+    } else {
+      query = `SELECT user_id, email, profile_picture 
+               FROM users 
+               WHERE user_id IN (?)`;
+      params = [userIds];
+    }
+    
+    console.log("[DEBUG] Executing query:", query.replace('?', JSON.stringify(params)));
+    
+    const [users] = await connection.query(query, params);
+    
+    console.log(`[INFO] Found ${users.length} users out of ${userIds.length} requested IDs`);
+    
+    // Process profile pictures and extract names from emails
+    const processedUsers = users.map(user => {
+      console.log(`[DEBUG] Processing user: ${user.user_id}, email: ${user.email}`);
+      
+      // Extract first and last name from email (assuming format: firstname.lastname@domain)
+      let firstName = "", lastName = "";
+      if (user.email) {
+        const emailParts = user.email.split('@')[0].split('.');
+        if (emailParts.length >= 2) {
+          firstName = emailParts[0].charAt(0).toUpperCase() + emailParts[0].slice(1);
+          lastName = emailParts[1].charAt(0).toUpperCase() + emailParts[1].slice(1);
+        } else if (emailParts.length === 1) {
+          firstName = emailParts[0].charAt(0).toUpperCase() + emailParts[0].slice(1);
+        }
+      }
+      
+      return {
+        user_id: user.user_id,
+        email: user.email,
+        first_name: firstName,
+        last_name: lastName,
+        profile_picture: user.profile_picture
+          ? Buffer.isBuffer(user.profile_picture)
+            ? "data:image/png;base64," + user.profile_picture.toString("base64")
+            : user.profile_picture
+          : null
+      };
+    });
+    
+    console.log(`[DEBUG] Returning ${processedUsers.length} processed users`);
+    res.json(processedUsers);
+  } catch (error) {
+    console.error("[ERROR] Error fetching batch user data:", error);
+    res.status(500).json({ message: "Failed to fetch user information: " + error.message });
+  }
+});
+
 // Socket.IO connection throttling
 let connectionCounter = 0;
 const connectionThrottle = {};
@@ -256,37 +327,25 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("vote", async (optionId) => {
-    // Implement vote throttling
-    if (voteThrottle[optionId] && now - voteThrottle[optionId] < 2000) {
-      console.log(`[THROTTLE] Rejecting rapid vote for option ${optionId}`);
-      socket.emit("voteResponse", { 
-        success: false, 
-        message: "Please wait before voting again" 
-      });
-      return;
-    }
-    voteThrottle[optionId] = now;
-    
-    console.log("[INFO] Received vote for option ID:", optionId);
+  socket.on("vote", async (data) => {
     try {
-      await vote(optionId);
-      // Invalidate cache when a vote is cast
-      invalidatePollCache();
-      const polls = await getCachedPolls();
-      io.emit("pollsUpdated", polls);
-      // Send success response back to the voting client
-      socket.emit("voteResponse", { 
-        success: true, 
-        message: "Vote registered successfully",
-        optionId: optionId
-      });
+      console.log("[DEBUG] Vote received:", data);
+      const { optionId, userId } = data;
+      
+      // Check for required parameters
+      if (!optionId || !userId) {
+        throw new Error("Invalid vote data: optionId and userId are required");
+      }
+      
+      // Call the vote function with both parameters
+      await vote(optionId, userId);
+      
+      // Emit updated polls to all clients
+      const updatedPolls = await getPolls();
+      io.emit("pollsUpdated", updatedPolls);
     } catch (error) {
       console.error("[ERROR] Error processing vote:", error);
-      socket.emit("voteResponse", { 
-        success: false,
-        message: "Failed to process your vote. Please try again."
-      });
+      socket.emit("error", { message: error.message });
     }
   });
 });

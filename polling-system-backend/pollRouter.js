@@ -47,7 +47,7 @@ const getPolls = async () => {
         const query = `
             SELECT p.id, p.question, p.created_by, p.created_by_id, p.created_at, 
                    p.class AS pollClass, p.expiry,
-                   po.id AS option_id, po.option_index, po.option_text, po.vote_count,
+                   po.id AS option_id, po.option_index, po.option_text, po.vote_count, po.voters,
                    u.profile_picture
             FROM polls p 
             LEFT JOIN poll_options po ON p.id = po.poll_id
@@ -81,6 +81,7 @@ const getPolls = async () => {
                 index: row.option_index,
                 text: row.option_text,
                 votes: row.vote_count || 0,
+                voters: row.voters || ""
             });
             return acc;
         }, {});
@@ -93,23 +94,48 @@ const getPolls = async () => {
 };
 
 // Vote for an option
-const vote = async (optionId) => {
+const vote = async (optionId, userId) => {
     const connection = await getConnection();
 
-    if (!optionId) {
-        throw new Error("Invalid input: Option ID is required.");
+    if (!optionId || !userId) {
+        throw new Error("Invalid input: Option ID and User ID are required.");
     }
 
     try {
-        // Use COALESCE to handle NULL vote counts
-        const query = `UPDATE poll_options SET vote_count = COALESCE(vote_count, 0) + 1 WHERE id = ?`;
-        const [result] = await connection.query(query, [optionId]);
+        console.log(`[DEBUG] Attempting vote update for option: ${optionId} by user: ${userId}`);
+        
+        // First, get current voters list for this option
+        const [optionRows] = await connection.query(
+            `SELECT vote_count, voters FROM poll_options WHERE id = ?`,
+            [optionId]
+        );
 
-        if (result.affectedRows === 0) {
+        if (optionRows.length === 0) {
             throw new Error("No option found with the given ID.");
         }
+
+        const currentVoters = optionRows[0].voters ? optionRows[0].voters.split(',') : [];
+        
+        // Check if user already voted for this option
+        if (currentVoters.includes(userId.toString())) {
+            console.log(`[INFO] User ${userId} already voted for option ${optionId}`);
+            return { alreadyVoted: true };
+        }
+
+        // Add user to voters list and update vote count
+        currentVoters.push(userId.toString());
+        const newVoters = currentVoters.join(',');
+        
+        const query = `UPDATE poll_options 
+                      SET vote_count = COALESCE(vote_count, 0) + 1, 
+                          voters = ? 
+                      WHERE id = ?`;
+        const [result] = await connection.query(query, [newVoters, optionId]);
+
+        console.log(`[INFO] Vote update succeeded for option: ${optionId} by user: ${userId}`);
+        return { success: true };
     } catch (error) {
-        console.error(`Vote update failed for option: ${optionId}`, error);
+        console.error(`[ERROR] Vote update failed for option: ${optionId}`, error);
         throw new Error("Failed to register vote.");
     }
 };
@@ -135,10 +161,13 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/vote", async (req, res) => {
-    const { optionId } = req.body;
+    const { optionId, userId } = req.body;
     try {
-        await vote(optionId);
-        res.status(200).json({ message: "Vote registered" });
+        const result = await vote(optionId, userId);
+        res.status(200).json({ 
+            message: "Vote registered",
+            ...result
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -23,6 +23,135 @@ import { useUserClasses, useAuth } from "./userDetails";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { VictoryPie } from "victory-native/lib/components/victory-pie";
 
+// Add properly typed interfaces for our data
+interface VoterInfo {
+  user_id: number | string;
+  email?: string;  // Add this property to match the backend response
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  profile_picture?: string | null;
+}
+
+// Create a separate component for the voter list to avoid hook ordering issues
+const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }) => {
+  const [voters, setVoters] = useState<VoterInfo[]>([]);
+  const [loadingVoters, setLoadingVoters] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch voter data when the component mounts or voterIds change
+  useEffect(() => {
+    if (voterIds.length === 0) return;
+    
+    console.log(`[DEBUG] VotersList getting data for poll ${pollId} with ${voterIds.length} voters:`, voterIds);
+    
+    const fetchVoters = async () => {
+      setLoadingVoters(true);
+      setError(null);
+      try {
+        // Ensure we're only sending valid, non-empty values
+        const validVoterIds = voterIds.filter(id => id && id.trim());
+        console.log(`[DEBUG] Sending ${validVoterIds.length} valid voterIds:`, validVoterIds);
+        
+        const response = await fetch(`${SERVER_IP}/api/users/batch`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userIds: validVoterIds }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[ERROR] Failed to fetch voter info (${response.status}):`, errorText);
+          setError(`Server error: ${response.status}`);
+          setVoters([]);
+          return;
+        }
+        
+        const responseText = await response.text();
+        console.log(`[DEBUG] Raw voter response:`, responseText);
+        
+        try {
+          const data = JSON.parse(responseText);
+          console.log(`[DEBUG] Parsed ${data.length} voters:`, data);
+          setVoters(data);
+        } catch (parseError) {
+          console.error("[ERROR] JSON parse error:", parseError);
+          setError("Failed to parse server response");
+          setVoters([]);
+        }
+      } catch (error) {
+        console.error("[ERROR] Fetch error:", error);
+        setError("Network error");
+        setVoters([]);
+      } finally {
+        setLoadingVoters(false);
+      }
+    };
+    
+    fetchVoters();
+  }, [pollId, voterIds.join(',')]);
+
+  // If no voters, return nothing
+  if (voterIds.length === 0) return null;
+
+  return (
+    <View style={{ marginTop: 20, width: '100%' }}>
+      <Text style={[styles.infoTitle, { fontSize: 18, marginBottom: 10 }]}>
+        Poll Participants ({voterIds.length})
+      </Text>
+      
+      {loadingVoters ? (
+        <ActivityIndicator size="small" color="#007AFF" style={{ marginVertical: 10 }} />
+      ) : error ? (
+        <Text style={{ color: 'red', fontStyle: 'italic', marginVertical: 10 }}>
+          {error}
+        </Text>
+      ) : voters.length > 0 ? (
+        <FlatList
+          data={voters}
+          keyExtractor={(item) => `voter-${item.user_id}`}
+          horizontal={false}
+          showsVerticalScrollIndicator={true}
+          style={{ maxHeight: 200 }}
+          contentContainerStyle={{ paddingBottom: 10 }}
+          renderItem={({ item }) => (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 6,
+              borderBottomWidth: 1,
+              borderBottomColor: '#eee'
+            }}>
+              <Image
+                source={{
+                  uri: processProfilePicture(item.profile_picture || null) || 
+                    'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
+                }}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  marginRight: 10
+                }}
+              />
+              <Text style={{ fontSize: 14 }}>
+                {item.first_name && item.last_name 
+                  ? `${item.first_name} ${item.last_name}` 
+                  : item.email || `User ${item.user_id}`}
+              </Text>
+            </View>
+          )}
+        />
+      ) : (
+        <Text style={{ color: '#666', fontStyle: 'italic' }}>
+          No participant data found
+        </Text>
+      )}
+    </View>
+  );
+};
 
 const PollView = () => {
   const { activeFilter: initialFilter } = useLocalSearchParams<{ activeFilter?: string }>();
@@ -32,6 +161,7 @@ const PollView = () => {
   const [voteLoading, setVoteLoading] = useState(false);
   const [infoPoll, setInfoPoll] = useState<Poll | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [userVotes, setUserVotes] = useState<{[key: number]: boolean}>({});
 
   // Get window dimensions for responsive layouts
   const { width: windowWidth } = useWindowDimensions();
@@ -104,7 +234,27 @@ const PollView = () => {
     const getPolls = async () => {
       try {
         await fetchPolls(data => {
-          if (isMounted) setPolls(data);
+          if (isMounted) {
+            setPolls(data);
+            
+            // Initialize user votes based on fetched polls
+            if (user) {
+              const votedOptions: {[key: number]: boolean} = {};
+              
+              data.forEach(poll => {
+                poll.options.forEach(option => {
+                  if (option.voters) {
+                    const voterIds = option.voters.split(',');
+                    if (voterIds.includes(user.user_id.toString())) {
+                      votedOptions[option.id] = true;
+                    }
+                  }
+                });
+              });
+              
+              setUserVotes(votedOptions);
+            }
+          }
         });
       } catch (error) {
         console.error("Error fetching polls:", error);
@@ -150,7 +300,7 @@ const PollView = () => {
       socket.off("pollsUpdated");
       socket.off("error");
     };
-  }, []);
+  }, [user]);
 
   // Ensure valid activeFilter
   useEffect(() => {
@@ -181,20 +331,42 @@ const PollView = () => {
 
   // Vote
   const vote = (optionId: number) => {
+    if (!user) {
+      // Could add a message that login is required
+      return;
+    }
+    
+    // Check if user has already voted for this option
+    if (userVotes[optionId]) {
+      return;
+    }
+    
     setVoteLoading(true);
+    
+    // Update local state immediately for a responsive UI
     setPolls((prevPolls) =>
       prevPolls.map((poll) => {
         const updatedOptions = poll.options.map((option) => {
           if (option.id === optionId) {
-            return { ...option, votes: option.votes + 1 };
+            return { 
+              ...option, 
+              votes: option.votes + 1,
+              voters: option.voters ? `${option.voters},${user.user_id}` : `${user.user_id}`
+            };
           }
           return option;
         });
         return { ...poll, options: updatedOptions };
       })
     );
-    socketRef.current.emit("vote", optionId);
-    // Remove spinner after short delay (socket will also update on server side)
+    
+    // Mark this option as voted by the user
+    setUserVotes(prev => ({...prev, [optionId]: true}));
+    
+    // Send vote to server with user ID
+    socketRef.current.emit("vote", { optionId, userId: user.user_id });
+    
+    // Remove spinner after short delay
     setTimeout(() => setVoteLoading(false), 2000);
   };
 
@@ -338,6 +510,11 @@ const PollView = () => {
 
   // Render each poll card
   const renderPoll = ({ item }: { item: Poll }) => {
+    // Check if user has voted in this poll
+    const userVotedInPoll = item.options.some(option => 
+      userVotes[option.id]
+    );
+    
     return (
       <View style={[styles.pollCard, isMobile && { marginHorizontal: 5, padding: 10 }]}>
         {renderPieChart(item)}
@@ -345,34 +522,46 @@ const PollView = () => {
           styles.voteOptionsContainer,
           isMobile && { flexDirection: "column", alignItems: "stretch", paddingHorizontal: 10 }
         ]}>
-          {item.options.map((option, index) => (
-            <View 
-              key={option.id} 
-              style={[
-                styles.voteButtonContainer,
-                isMobile && { width: "100%", marginVertical: 4, flexDirection: "row", justifyContent: "space-between" }
-              ]}
-            >
-              <View style={{ 
-                flexDirection: "row", 
-                alignItems: "center", 
-                marginBottom: isMobile ? 0 : 4,
-                flex: isMobile ? 1 : undefined 
-              }}>
-                <View style={[styles.swatchBox, { backgroundColor: chartColors[index % chartColors.length] }]} />
-                <Text style={[styles.swatchText, isMobile && { flex: 1, marginRight: 8, flexWrap: 'wrap' }]} numberOfLines={2}>
-                  {option.text}
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={[styles.voteButton, isMobile && { minWidth: 70 }]}
-                onPress={() => vote(option.id)}
-                disabled={voteLoading}
+          {item.options.map((option, index) => {
+            const hasVoted = userVotes[option.id];
+            const isDisabled = voteLoading || userVotedInPoll;
+            
+            return (
+              <View 
+                key={option.id} 
+                style={[
+                  styles.voteButtonContainer,
+                  isMobile && { width: "100%", marginVertical: 4, flexDirection: "row", justifyContent: "space-between" }
+                ]}
               >
-                <Text style={styles.voteButtonText}>VOTE</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+                <View style={{ 
+                  flexDirection: "row", 
+                  alignItems: "center", 
+                  marginBottom: isMobile ? 0 : 4,
+                  flex: isMobile ? 1 : undefined 
+                }}>
+                  <View style={[styles.swatchBox, { backgroundColor: chartColors[index % chartColors.length] }]} />
+                  <Text style={[styles.swatchText, isMobile && { flex: 1, marginRight: 8, flexWrap: 'wrap' }]} numberOfLines={2}>
+                    {option.text}
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  style={[
+                    styles.voteButton, 
+                    isMobile && { minWidth: 70 },
+                    hasVoted && { backgroundColor: '#4CAF50' },
+                    isDisabled && !hasVoted && { backgroundColor: '#cccccc' }
+                  ]}
+                  onPress={() => vote(option.id)}
+                  disabled={isDisabled}
+                >
+                  <Text style={styles.voteButtonText}>
+                    {hasVoted ? 'VOTED' : 'VOTE'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
         </View>
       </View>
     );
@@ -396,6 +585,29 @@ const PollView = () => {
       hour: "2-digit",
       minute: "2-digit",
     })}`;
+  };
+
+  // Add this helper function to extract voters from poll options
+  const getUniqueVotersFromPoll = (poll: Poll): string[] => {
+    // Create a map to store voter IDs
+    const voterIdsMap: Record<string, boolean> = {};
+    
+    // Collect all voter IDs from each option
+    poll.options.forEach(option => {
+      if (option.voters) {
+        console.log(`[DEBUG] Option ${option.id} has voters: ${option.voters}`);
+        const voterIds = option.voters.split(',').filter(id => id && id.trim());
+        voterIds.forEach(id => {
+          voterIdsMap[id] = true;
+        });
+      }
+    });
+    
+    // Convert to array and filter out empty strings
+    const uniqueVoterIds = Object.keys(voterIdsMap).filter(id => id && id.trim());
+    console.log(`[DEBUG] Found ${uniqueVoterIds.length} unique voters for poll ${poll.id}:`, uniqueVoterIds);
+    
+    return uniqueVoterIds;
   };
 
   return (
@@ -546,7 +758,7 @@ const PollView = () => {
                         
                       return (
                         <View key={option.id} style={{
-                          flexDirection: 'column', // Changed to column for mobile
+                          flexDirection: 'column',
                           marginBottom: 10,
                           paddingVertical: 4,
                           borderBottomWidth: index < infoPoll.options.length - 1 ? 1 : 0,
@@ -585,6 +797,14 @@ const PollView = () => {
                 </Text>
               )}
             </View>
+            
+            {/* Voters section - using the dedicated component */}
+            {infoPoll && 
+              <VotersList 
+                pollId={infoPoll.id}
+                voterIds={getUniqueVotersFromPoll(infoPoll)}
+              />
+            }
           </View>
         </Animated.View>
       )}
