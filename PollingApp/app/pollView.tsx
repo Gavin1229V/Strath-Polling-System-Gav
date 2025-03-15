@@ -13,6 +13,7 @@ import {
   Animated,
   useWindowDimensions,
   RefreshControl,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons"; // Make sure Ionicons is imported
 import styles from "../styles/styles";
@@ -22,6 +23,7 @@ import { Poll } from "./global";
 import { useUserClasses, useAuth } from "./userDetails";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { VictoryPie } from "victory-native/lib/components/victory-pie";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Add properly typed interfaces for our data
 interface VoterInfo {
@@ -31,6 +33,7 @@ interface VoterInfo {
   first_name?: string;
   last_name?: string;
   profile_picture?: string | null;
+  anonymous_index?: number;  // Add this property for anonymous participants
 }
 
 // Create a separate component for the voter list to avoid hook ordering issues
@@ -47,15 +50,22 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
       setLoadingVoters(true);
       setError(null);
       try {
-        // Ensure we're only sending valid, non-empty values
-        const validVoterIds = voterIds.filter(id => id && id.trim());
+        // Count the anonymous voters for debugging
+        const anonymousCount = voterIds.filter(id => id === "1").length;
+        console.log(`[DEBUG] Poll ${pollId} - Fetching voter info for ${voterIds.length} voters (${anonymousCount} anonymous)`);
+        
+        if (anonymousCount > 0) {
+          console.log(`[DEBUG] Anonymous voter IDs positions:`, 
+            voterIds.map((id, index) => id === "1" ? index : null).filter(idx => idx !== null)
+          );
+        }
         
         const response = await fetch(`${SERVER_IP}/api/users/batch`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ userIds: validVoterIds }),
+          body: JSON.stringify({ userIds: voterIds }), // Send the exact array with duplicated "1"s
         });
         
         if (!response.ok) {
@@ -66,16 +76,33 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
           return;
         }
         
-        const responseText = await response.text();
+        const data = await response.json();
+        console.log(`[DEBUG] Poll ${pollId} - Received ${data.length} voters from server`);
         
-        try {
-          const data = JSON.parse(responseText);
-          setVoters(data);
-        } catch (parseError) {
-          console.error("JSON parse error:", parseError);
-          setError("Failed to parse server response");
-          setVoters([]);
+        // Check if we received the right number of anonymous participants
+        const receivedAnonymous = data.filter((v: VoterInfo) => v.user_id === 1 || v.user_id === "1");
+        console.log(`[DEBUG] Poll ${pollId} - Received ${receivedAnonymous.length} anonymous participants out of ${anonymousCount} expected`);
+        
+        if (receivedAnonymous.length > 0) {
+          console.log(`[DEBUG] Anonymous participants:`, receivedAnonymous.map((v: VoterInfo) => 
+            `${v.first_name} ${v.last_name || ''} (index: ${v.anonymous_index !== undefined ? v.anonymous_index : 'undefined'})`
+          ).join(', '));
         }
+        
+        // The server already sorts with anonymous users at the end,
+        // but we can ensure it here as well
+        const sortedData = [...data].sort((a, b) => {
+          // Regular users first, anonymous users last
+          if ((a.user_id === 1 || a.user_id === "1") && (b.user_id !== 1 && b.user_id !== "1")) 
+            return 1;
+          if ((a.user_id !== 1 && a.user_id !== "1") && (b.user_id === 1 || b.user_id === "1")) 
+            return -1;
+          return 0;
+        });
+        
+        console.log(`[DEBUG] Poll ${pollId} - Sorted voters with regular users first, then anonymous`);
+        
+        setVoters(sortedData);
       } catch (error) {
         console.error("Fetch error:", error);
         setError("Network error");
@@ -106,7 +133,7 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
       ) : voters.length > 0 ? (
         <FlatList
           data={voters}
-          keyExtractor={(item) => `voter-${item.user_id}`}
+          keyExtractor={(item, index) => `voter-${item.user_id}-${item.anonymous_index !== undefined ? item.anonymous_index : ''}-${index}`}
           horizontal={false}
           showsVerticalScrollIndicator={true}
           style={{ maxHeight: 200 }}
@@ -121,8 +148,10 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
             }}>
               <Image
                 source={{
-                  uri: processProfilePicture(item.profile_picture || null) || 
-                    'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
+                  uri: item.user_id === 1 || item.user_id === "1"
+                    ? 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y' // Anonymous user image
+                    : processProfilePicture(item.profile_picture || null) || 
+                      'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
                 }}
                 style={{
                   width: 30,
@@ -132,9 +161,11 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
                 }}
               />
               <Text style={{ fontSize: 14 }}>
-                {item.first_name && item.last_name 
-                  ? `${item.first_name} ${item.last_name}` 
-                  : item.email || `User ${item.user_id}`}
+                {item.user_id === 1 || item.user_id === "1"
+                  ? "Anonymous Participant" // Always display anonymous users with this name, no numbering
+                  : (item.first_name && item.last_name 
+                      ? `${item.first_name} ${item.last_name}` 
+                      : (item.email || `User ${item.user_id}`))}
               </Text>
             </View>
           )}
@@ -157,6 +188,8 @@ const PollView = () => {
   const [infoPoll, setInfoPoll] = useState<Poll | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userVotes, setUserVotes] = useState<{[key: number]: boolean}>({});
+  const [anonymousMode, setAnonymousMode] = useState<boolean>(false);
+  const [anonymousVotes, setAnonymousVotes] = useState<{[key: number]: boolean}>({});
 
   // Get window dimensions for responsive layouts
   const { width: windowWidth } = useWindowDimensions();
@@ -222,6 +255,60 @@ const PollView = () => {
     }
   }, [user, userClasses]);
 
+  // Load anonymous mode setting and anonymous votes from storage
+  useEffect(() => {
+    const loadAnonymousSettings = async () => {
+      try {
+        // Load anonymous mode state
+        const storedAnonymousMode = await AsyncStorage.getItem('anonymousMode');
+        if (storedAnonymousMode !== null) {
+          setAnonymousMode(storedAnonymousMode === 'true');
+        }
+        
+        // Load anonymous votes
+        const storedAnonymousVotes = await AsyncStorage.getItem('anonymousVotes');
+        if (storedAnonymousVotes !== null) {
+          setAnonymousVotes(JSON.parse(storedAnonymousVotes));
+        }
+      } catch (error) {
+        console.error('Failed to load anonymous settings:', error);
+      }
+    };
+    
+    loadAnonymousSettings();
+  }, []);
+
+  // Save anonymous mode state when it changes
+  useEffect(() => {
+    const saveAnonymousMode = async () => {
+      try {
+        await AsyncStorage.setItem('anonymousMode', anonymousMode.toString());
+      } catch (error) {
+        console.error('Failed to save anonymous mode:', error);
+      }
+    };
+    
+    saveAnonymousMode();
+  }, [anonymousMode]);
+
+  // Save anonymous votes when they change
+  useEffect(() => {
+    const saveAnonymousVotes = async () => {
+      try {
+        await AsyncStorage.setItem('anonymousVotes', JSON.stringify(anonymousVotes));
+      } catch (error) {
+        console.error('Failed to save anonymous votes:', error);
+      }
+    };
+    
+    saveAnonymousVotes();
+  }, [anonymousVotes]);
+
+  // Toggle anonymous mode and handle state persistence
+  const toggleAnonymousMode = useCallback(() => {
+    setAnonymousMode(prev => !prev);
+  }, []);
+
   // Fetch polls and setup socket listeners with better error handling
   useEffect(() => {
     let isMounted = true;
@@ -242,6 +329,15 @@ const PollView = () => {
                     const voterIds = option.voters.split(',');
                     if (voterIds.includes(user.user_id.toString())) {
                       votedOptions[option.id] = true;
+                    }
+                    
+                    // Check for anonymous votes (voter ID = 1) and mark them if in anonymous mode
+                    if (voterIds.includes("1") && anonymousMode) {
+                      // Load the anonymousVotes to check if this user voted anonymously
+                      const optionId = option.id;
+                      if (anonymousVotes[optionId]) {
+                        votedOptions[optionId] = true;
+                      }
                     }
                   }
                 });
@@ -295,7 +391,7 @@ const PollView = () => {
       socket.off("pollsUpdated");
       socket.off("error");
     };
-  }, [user]);
+  }, [user, anonymousMode, anonymousVotes]);
 
   // Ensure valid activeFilter
   useEffect(() => {
@@ -324,7 +420,7 @@ const PollView = () => {
     );
   }
 
-  // Vote
+  // Vote with anonymous mode tracking
   const vote = (optionId: number) => {
     if (!user) {
       // Could add a message that login is required
@@ -336,7 +432,15 @@ const PollView = () => {
       return;
     }
     
+    // Check if this is an anonymous vote that was already cast
+    if (anonymousMode && anonymousVotes[optionId]) {
+      return;
+    }
+    
     setVoteLoading(true);
+    
+    // Use user ID 1 for anonymous voting or the actual user ID otherwise
+    const voteUserId = anonymousMode ? 1 : user.user_id;
     
     // Update local state immediately for a responsive UI
     setPolls((prevPolls) =>
@@ -346,7 +450,7 @@ const PollView = () => {
             return { 
               ...option, 
               votes: option.votes + 1,
-              voters: option.voters ? `${option.voters},${user.user_id}` : `${user.user_id}`
+              voters: option.voters ? `${option.voters},${voteUserId}` : `${voteUserId}`
             };
           }
           return option;
@@ -355,11 +459,16 @@ const PollView = () => {
       })
     );
     
+    // If in anonymous mode, track this vote in anonymous votes
+    if (anonymousMode) {
+      setAnonymousVotes(prev => ({...prev, [optionId]: true}));
+    }
+    
     // Mark this option as voted by the user
     setUserVotes(prev => ({...prev, [optionId]: true}));
     
-    // Send vote to server with user ID
-    socketRef.current.emit("vote", { optionId, userId: user.user_id });
+    // Send vote to server with user ID (anonymous or real)
+    socketRef.current.emit("vote", { optionId, userId: voteUserId });
     
     // Remove spinner after short delay
     setTimeout(() => setVoteLoading(false), 2000);
@@ -503,12 +612,20 @@ const PollView = () => {
     );
   };
 
-  // Render each poll card
+  // Render each poll card with anonymous vote check
   const renderPoll = ({ item }: { item: Poll }) => {
     // Check if user has voted in this poll
     const userVotedInPoll = item.options.some(option => 
       userVotes[option.id]
     );
+    
+    // Check if anonymous user has voted in this poll
+    const anonymousVotedInPoll = anonymousMode && item.options.some(option => 
+      anonymousVotes[option.id]
+    );
+    
+    // Determine if voting is disabled
+    const votingDisabled = voteLoading || userVotedInPoll || anonymousVotedInPoll;
     
     return (
       <View style={[styles.pollCard, isMobile && { marginHorizontal: 5, padding: 10 }]}>
@@ -518,8 +635,7 @@ const PollView = () => {
           isMobile && { flexDirection: "column", alignItems: "stretch", paddingHorizontal: 10 }
         ]}>
           {item.options.map((option, index) => {
-            const hasVoted = userVotes[option.id];
-            const isDisabled = voteLoading || userVotedInPoll;
+            const hasVoted = userVotes[option.id] || (anonymousMode && anonymousVotes[option.id]);
             
             return (
               <View 
@@ -545,10 +661,10 @@ const PollView = () => {
                     styles.voteButton, 
                     isMobile && { minWidth: 70 },
                     hasVoted && { backgroundColor: '#4CAF50' },
-                    isDisabled && !hasVoted && { backgroundColor: '#cccccc' }
+                    votingDisabled && !hasVoted && { backgroundColor: '#cccccc' }
                   ]}
                   onPress={() => vote(option.id)}
-                  disabled={isDisabled}
+                  disabled={votingDisabled}
                 >
                   <Text style={styles.voteButtonText}>
                     {hasVoted ? 'VOTED' : 'VOTE'}
@@ -584,23 +700,41 @@ const PollView = () => {
 
   // Add this helper function to extract voters from poll options
   const getUniqueVotersFromPoll = (poll: Poll): string[] => {
-    // Create a map to store voter IDs
-    const voterIdsMap: Record<string, boolean> = {};
+    if (!poll || !poll.options) return [];
     
-    // Collect all voter IDs from each option
+    // For regular users, we want to deduplicate
+    const regularVoterIds = new Set<string>();
+    // For anonymous users (ID "1"), we need to keep track of how many there are
+    let anonymousVoterCount = 0;
+    
+    // Count all voters across all options
     poll.options.forEach(option => {
       if (option.voters) {
         const voterIds = option.voters.split(',').filter(id => id && id.trim());
         voterIds.forEach(id => {
-          voterIdsMap[id] = true;
+          if (id === "1") {
+            anonymousVoterCount++;
+          } else {
+            regularVoterIds.add(id);
+          }
         });
       }
     });
     
-    // Convert to array and filter out empty strings
-    const uniqueVoterIds = Object.keys(voterIdsMap).filter(id => id && id.trim());
+    // Build the final array with regular users first, then anonymous users
+    const result: string[] = [];
     
-    return uniqueVoterIds;
+    // Add regular voter IDs (already deduplicated by the Set)
+    result.push(...Array.from(regularVoterIds));
+    
+    // Add all anonymous voter IDs (preserving duplicates) after regular users
+    for (let i = 0; i < anonymousVoterCount; i++) {
+      result.push("1");
+    }
+    
+    console.log(`[DEBUG] Poll ${poll.id} - getUniqueVotersFromPoll found ${regularVoterIds.size} unique regular users and ${anonymousVoterCount} anonymous voters`);
+    
+    return result;
   };
 
   return (
@@ -620,53 +754,77 @@ const PollView = () => {
           />
         }
         ListHeaderComponent={
-          <View style={{
-            marginBottom: 10,
-            backgroundColor: '#F2F4F8',
-            borderRadius: 12,
-            paddingVertical: 10,
-            marginHorizontal: isMobile ? 5 : 16,
-            marginTop: 10
-          }}>
-            <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#555' }}>
-                <Ionicons name="filter-outline" size={16} color="#555" /> Filter by Class:
+          <View>
+            {/* Anonymous Mode Toggle */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              alignItems: 'center',
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              marginTop: 5
+            }}>
+              <Text style={{ marginRight: 10, fontSize: 14, fontWeight: '500' }}>
+                Anonymous Mode
               </Text>
+              <Switch
+                trackColor={{ false: "#767577", true: "#81b0ff" }}
+                thumbColor={anonymousMode ? "#007AFF" : "#f4f3f4"}
+                ios_backgroundColor="#3e3e3e"
+                onValueChange={toggleAnonymousMode}
+                value={anonymousMode}
+              />
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 12 }}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.yearFilterChip,
-                  activeFilter === "All" && styles.yearFilterChipActive,
-                ]}
-                onPress={() => setActiveFilter("All")}
+            
+            {/* Class Filter */}
+            <View style={{
+              marginBottom: 10,
+              backgroundColor: '#F2F4F8',
+              borderRadius: 12,
+              paddingVertical: 10,
+              marginHorizontal: isMobile ? 5 : 16,
+              marginTop: 5
+            }}>
+              <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#555' }}>
+                  <Ionicons name="filter-outline" size={16} color="#555" /> Filter by Class:
+                </Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 12 }}
               >
-                <Text style={[
-                  styles.yearFilterChipText,
-                  activeFilter === "All" && styles.yearFilterChipTextActive
-                ]}>All Classes</Text>
-              </TouchableOpacity>
-              
-              {currentClasses.map((cls) => (
                 <TouchableOpacity
-                  key={cls}
                   style={[
                     styles.yearFilterChip,
-                    activeFilter === cls && styles.yearFilterChipActive,
+                    activeFilter === "All" && styles.yearFilterChipActive,
                   ]}
-                  onPress={() => setActiveFilter(cls)}
+                  onPress={() => setActiveFilter("All")}
                 >
                   <Text style={[
                     styles.yearFilterChipText,
-                    activeFilter === cls && styles.yearFilterChipTextActive
-                  ]}>{cls}</Text>
+                    activeFilter === "All" && styles.yearFilterChipTextActive
+                  ]}>All Classes</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+                
+                {currentClasses.map((cls) => (
+                  <TouchableOpacity
+                    key={cls}
+                    style={[
+                      styles.yearFilterChip,
+                      activeFilter === cls && styles.yearFilterChipActive,
+                    ]}
+                    onPress={() => setActiveFilter(cls)}
+                  >
+                    <Text style={[
+                      styles.yearFilterChipText,
+                      activeFilter === cls && styles.yearFilterChipTextActive
+                    ]}>{cls}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           </View>
         }
         ListEmptyComponent={

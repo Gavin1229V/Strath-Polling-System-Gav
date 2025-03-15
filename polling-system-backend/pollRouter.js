@@ -57,6 +57,38 @@ const getPolls = async () => {
 
         const [rows] = await connection.query(query);
 
+        // Get all voter information for these polls
+        const allVoterIds = new Set();
+        rows.forEach(row => {
+            if (row.voters) {
+                row.voters.split(',').forEach(id => {
+                    if (id && id.trim()) allVoterIds.add(id.trim());
+                });
+            }
+        });
+        
+        // Fetch user info for all voters
+        const voterMap = {}; // Define voterMap here
+        if (allVoterIds.size > 0) {
+            const voterIds = Array.from(allVoterIds);
+            const [voters] = await connection.query(
+                `SELECT user_id, email, profile_picture FROM users WHERE user_id IN (?)`,
+                [voterIds]
+            );
+            
+            voters.forEach(voter => {
+                voterMap[voter.user_id] = {
+                    id: voter.user_id,
+                    username: voter.username,
+                    profile_picture: voter.profile_picture
+                        ? Buffer.isBuffer(voter.profile_picture)
+                            ? "data:image/png;base64," + voter.profile_picture.toString("base64")
+                            : voter.profile_picture
+                        : null
+                };
+            });
+        }
+
         // Group options by poll and convert profile picture to proper format
         const polls = rows.reduce((acc, row) => {
             if (!acc[row.id]) {
@@ -73,7 +105,8 @@ const getPolls = async () => {
                           : row.profile_picture)
                       : null,
                     created_at: row.created_at,
-                    options: [] 
+                    options: [],
+                    voters: [] // Initialize as an empty array
                 };
             }
             acc[row.id].options.push({
@@ -83,6 +116,22 @@ const getPolls = async () => {
                 votes: row.vote_count || 0,
                 voters: row.voters || ""
             });
+
+            // Add voters to the poll object - improved handling for anonymous voters
+            if (row.voters) {
+                const voterIds = row.voters.split(',');
+                voterIds.forEach(voterId => {
+                    const trimmedId = voterId.trim();
+                    if (trimmedId === "1") {
+                        // For anonymous users, add a new entry each time to count them individually
+                        acc[row.id].voters.push({ id: "1", username: "Anonymous" });
+                    } else if (voterMap[trimmedId] && !acc[row.id].voters.some(v => v.id === trimmedId)) {
+                        // For logged-in users, avoid duplicates within the poll
+                        acc[row.id].voters.push(voterMap[trimmedId]);
+                    }
+                });
+            }
+
             return acc;
         }, {});
 

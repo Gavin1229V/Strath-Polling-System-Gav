@@ -249,7 +249,7 @@ const ElectionsScreen = () => {
             <Ionicons name="information-circle-outline" size={40} color="#999" />
             <Text style={{ marginTop: 8, color: "#666", textAlign: "center" }}>
               {activeYearFilter !== null ? 
-                `No elections found for Year ${activeYearFilter}.` : 
+                `No active election found for Year ${activeYearFilter}.` : 
                 "No elections found."}
             </Text>
           </View>

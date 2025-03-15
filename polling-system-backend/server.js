@@ -211,29 +211,89 @@ app.post("/api/users/batch", async (req, res) => {
     
     console.log("[DEBUG] Looking up voter IDs:", userIds);
     
-    // Handle single ID case separately (MySQL parameter formatting issue)
-    let query, params;
-    if (userIds.length === 1) {
-      query = `SELECT user_id, email, profile_picture 
-               FROM users 
-               WHERE user_id = ?`;
-      params = [userIds[0]];
-    } else {
-      query = `SELECT user_id, email, profile_picture 
-               FROM users 
-               WHERE user_id IN (?)`;
-      params = [userIds];
+    // Count anonymous users - Important: preserve each occurrence individually
+    const anonymousPositions = [];
+    userIds.forEach((id, index) => {
+      if (id === "1" || id === 1) {
+        anonymousPositions.push(index);
+      }
+    });
+    
+    const anonymousUserCount = anonymousPositions.length;
+    const nonAnonymousIds = userIds.filter(id => id !== "1" && id !== 1);
+    
+    console.log(`[DEBUG] Found ${anonymousUserCount} anonymous users and ${nonAnonymousIds.length} regular users`);
+    
+    // Process regular users
+    let regularUserResults = [];
+    
+    if (nonAnonymousIds.length > 0) {
+      // Handle single non-anonymous ID case separately (MySQL parameter formatting issue)
+      let query, params;
+      if (nonAnonymousIds.length === 1) {
+        query = `SELECT user_id, email, profile_picture 
+                 FROM users 
+                 WHERE user_id = ?`;
+        params = [nonAnonymousIds[0]];
+      } else {
+        query = `SELECT user_id, email, profile_picture 
+                 FROM users 
+                 WHERE user_id IN (?)`;
+        params = [nonAnonymousIds];
+      }
+      
+      console.log("[DEBUG] Executing query:", query.replace('?', JSON.stringify(params)));
+      
+      const [regularUsers] = await connection.query(query, params);
+      regularUserResults = [...regularUsers];
     }
     
-    console.log("[DEBUG] Executing query:", query.replace('?', JSON.stringify(params)));
+    // Create result array with proper ordering
+    const finalResults = [];
     
-    const [users] = await connection.query(query, params);
+    // Create a mapping of user_id to fetched user data for regular users
+    const regularUserMap = {};
+    regularUserResults.forEach(user => {
+      regularUserMap[user.user_id] = user;
+    });
     
-    console.log(`[INFO] Found ${users.length} users out of ${userIds.length} requested IDs`);
+    // Build final results array with users in their original positions
+    let anonymousCounter = 0;
+    
+    userIds.forEach((id, index) => {
+      if (id === "1" || id === 1) {
+        // For anonymous user, create a new entry with unique index
+        finalResults.push({
+          user_id: 1,
+          email: "anonymous@participant",
+          profile_picture: null,
+          anonymous_index: anonymousCounter++
+        });
+      } else {
+        // For regular user, add from our fetched results
+        const user = regularUserMap[id];
+        if (user) {
+          finalResults.push(user);
+        }
+      }
+    });
+    
+    console.log(`[INFO] Found ${finalResults.length} users out of ${userIds.length} requested IDs`);
     
     // Process profile pictures and extract names from emails
-    const processedUsers = users.map(user => {
-      console.log(`[DEBUG] Processing user: ${user.user_id}, email: ${user.email}`);
+    const processedUsers = finalResults.map(user => {
+      // Special handling for anonymous user - MODIFIED: removed the number after "Participant"
+      if (user.user_id === 1) {
+        return {
+          user_id: 1,
+          email: "anonymous@participant",
+          first_name: "Anonymous",
+          last_name: "Participant", // Removed numbering here
+          profile_picture: null,
+          anonymous_index: user.anonymous_index, // Keep this for internal tracking
+          is_anonymous: true // Add this flag for sorting
+        };
+      }
       
       // Extract first and last name from email (assuming format: firstname.lastname@domain)
       let firstName = "", lastName = "";
@@ -256,11 +316,19 @@ app.post("/api/users/batch", async (req, res) => {
           ? Buffer.isBuffer(user.profile_picture)
             ? "data:image/png;base64," + user.profile_picture.toString("base64")
             : user.profile_picture
-          : null
+          : null,
+        is_anonymous: false // Add this flag for sorting
       };
     });
     
-    console.log(`[DEBUG] Returning ${processedUsers.length} processed users`);
+    // Sort the users - regular users first, anonymous users last
+    processedUsers.sort((a, b) => {
+      // If one is anonymous and the other isn't, non-anonymous comes first
+      if (a.is_anonymous && !b.is_anonymous) return 1;
+      if (!a.is_anonymous && b.is_anonymous) return -1;
+      return 0; // Otherwise keep original order
+    });
+    
     res.json(processedUsers);
   } catch (error) {
     console.error("[ERROR] Error fetching batch user data:", error);
