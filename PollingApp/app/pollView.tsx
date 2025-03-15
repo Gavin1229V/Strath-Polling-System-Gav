@@ -14,8 +14,9 @@ import {
   useWindowDimensions,
   RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons"; // Make sure Ionicons is imported
 import styles from "../styles/styles";
-import { fetchPolls, getSocket } from "./global";
+import { fetchPolls, getSocket, processProfilePicture } from "./global";
 import { SERVER_IP } from "./config";
 import { Poll } from "./global";
 import { useUserClasses, useAuth } from "./userDetails";
@@ -215,7 +216,7 @@ const PollView = () => {
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: false,  // Changed from true to false
     }).start();
   };
 
@@ -224,7 +225,7 @@ const PollView = () => {
     Animated.timing(slideAnim, {
       toValue: -300,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: false,  // Changed from true to false
     }).start(() => {
       setInfoPoll(null);
     });
@@ -234,19 +235,8 @@ const PollView = () => {
   const renderPieChart = (poll: Poll) => {
     const pollClass = poll.pollClass || (poll as any)["class"] || "";
 
-    // Profile pic logic
-    let profilePicUrl = null;
-    if (poll.profile_picture && typeof poll.profile_picture === "string") {
-      let pic = poll.profile_picture.trim();
-      if (pic.startsWith(`"`) && pic.endsWith(`"`)) {
-        pic = pic.slice(1, -1);
-      }
-      if (pic.startsWith("data:") || pic.startsWith("http://") || pic.startsWith("https://")) {
-        profilePicUrl = pic;
-      } else {
-        profilePicUrl = `${SERVER_IP}/${pic}`;
-      }
-    }
+    // Use the shared profile picture processing function
+    let profilePicUrl = processProfilePicture(poll.profile_picture);
 
     // Transform data for VictoryPie
     const data = poll.options.map((option, index) => ({
@@ -261,6 +251,21 @@ const PollView = () => {
     // Increase chart size while keeping it responsive
     const chartWidth = Math.min(380, screenWidth - 40);
     const chartHeight = Math.min(280, chartWidth * 0.8);
+
+    // Platform-specific label styles to avoid web warnings
+    const labelStyles = Platform.select({
+      web: {
+        fill: "#fff",
+        fontSize: 14,
+        fontWeight: "bold",
+      },
+      default: {
+        fill: "#fff",
+        fontSize: 14,
+        fontWeight: "bold",
+        textShadow: "1px 1px 2px rgba(0,0,0,0.5)"
+      }
+    });
 
     return (
       <View style={{ marginVertical: 10, position: "relative" }}>
@@ -306,12 +311,7 @@ const PollView = () => {
                   stroke: "#fff",
                   strokeWidth: 1
                 },
-                labels: { 
-                  fill: "#fff",
-                  fontSize: 14,
-                  fontWeight: "bold",
-                  textShadow: "1px 1px 2px rgba(0,0,0,0.5)"
-                }
+                labels: labelStyles
               }}
               animate={{
                 duration: 2000,
@@ -330,48 +330,7 @@ const PollView = () => {
             </Text>
           )}
           
-          {/* Custom legend - hide vote counts on small mobile */}
-          <View style={{ width: chartWidth, marginTop: 10, paddingHorizontal: isMobile ? 5 : 0 }}>
-            {data.map((item, index) => (
-              <View key={index} style={{ 
-                flexDirection: "row", 
-                alignItems: "center", 
-                marginVertical: 5,
-                justifyContent: "space-between",
-                width: '100%',
-                paddingRight: 5
-              }}>
-                <View style={{ 
-                  flexDirection: "row", 
-                  alignItems: "center",
-                  flex: 1,
-                }}>
-                  <View style={[styles.swatchBox, { backgroundColor: item.color, flexShrink: 0 }]} />
-                  <Text 
-                    style={{ 
-                      marginLeft: 8, 
-                      fontSize: isMobile ? 11 : 13,
-                      flex: 1
-                    }} 
-                    numberOfLines={1} 
-                    ellipsizeMode="tail"
-                  >
-                    {item.x}
-                  </Text>
-                </View>
-                {/* Only show vote counts on screens that aren't too small */}
-                {screenWidth >= 360 && (
-                  <Text style={{ 
-                    fontSize: isMobile ? 10 : 12, 
-                    fontWeight: "500",
-                    marginLeft: 4
-                  }}>
-                    {item.y} vote{item.y !== 1 ? 's' : ''}
-                  </Text>
-                )}
-              </View>
-            ))}
-          </View>
+          {/* Removed custom legend section - poll options will only be displayed once with the vote buttons */}
         </View>
       </View>
     );
@@ -456,40 +415,54 @@ const PollView = () => {
           />
         }
         ListHeaderComponent={
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterScrollView}
-          >
-            <TouchableOpacity
-              style={[
-                styles.filterButton, 
-                activeFilter === "All" && styles.activeFilterButton
-              ]}
-              onPress={() => setActiveFilter("All")}
+          <View style={{
+            marginBottom: 10,
+            backgroundColor: '#F2F4F8',
+            borderRadius: 12,
+            paddingVertical: 10,
+            marginHorizontal: isMobile ? 5 : 16,
+            marginTop: 10
+          }}>
+            <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#555' }}>
+                <Ionicons name="filter-outline" size={16} color="#555" /> Filter by Class:
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 12 }}
             >
-              <Text style={[
-                styles.filterButtonText,
-                activeFilter === "All" && styles.activeFilterText
-              ]}>All</Text>
-            </TouchableOpacity>
-            
-            {currentClasses.map((cls) => (
               <TouchableOpacity
-                key={cls}
                 style={[
-                  styles.filterButton,
-                  activeFilter === cls && styles.activeFilterButton
+                  styles.yearFilterChip,
+                  activeFilter === "All" && styles.yearFilterChipActive,
                 ]}
-                onPress={() => setActiveFilter(cls)}
+                onPress={() => setActiveFilter("All")}
               >
                 <Text style={[
-                  styles.filterButtonText,
-                  activeFilter === cls && styles.activeFilterText
-                ]}>{cls}</Text>
+                  styles.yearFilterChipText,
+                  activeFilter === "All" && styles.yearFilterChipTextActive
+                ]}>All Classes</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+              
+              {currentClasses.map((cls) => (
+                <TouchableOpacity
+                  key={cls}
+                  style={[
+                    styles.yearFilterChip,
+                    activeFilter === cls && styles.yearFilterChipActive,
+                  ]}
+                  onPress={() => setActiveFilter(cls)}
+                >
+                  <Text style={[
+                    styles.yearFilterChipText,
+                    activeFilter === cls && styles.yearFilterChipTextActive
+                  ]}>{cls}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -525,15 +498,11 @@ const PollView = () => {
               <Text style={styles.closeButtonText}>×</Text>
             </TouchableOpacity>
             
-            {/* Profile picture on the right inside the info card */}
+            {/* Profile picture using shared function */}
             {infoPoll.profile_picture ? (
               <Image
                 source={{
-                  uri:
-                    infoPoll.profile_picture.startsWith(`"`) &&
-                    infoPoll.profile_picture.endsWith(`"`)
-                      ? infoPoll.profile_picture.slice(1, -1)
-                      : infoPoll.profile_picture,
+                  uri: processProfilePicture(infoPoll.profile_picture) || undefined
                 }}
                 style={[styles.infoProfilePic, { marginTop: 10, width: 90, height: 90, borderRadius: 50 }]}
               />
@@ -596,11 +565,12 @@ const PollView = () => {
                             <View style={{
                               height: 6,
                               backgroundColor: chartColors[index % chartColors.length],
-                              width: `${Math.min(percentage, 60)}%`, // Limit width to prevent overflow
+                              width: `${percentage}%`,
+                              maxWidth: '60%',
                               borderRadius: 3,
                               marginRight: 8
                             }} />
-                            <Text style={{ fontSize: 13, color: '#555', flexShrink: 0 }}>
+                            <Text style={{ fontSize: 13, color: '#555' }}>
                               {option.votes} vote{option.votes !== 1 ? 's' : ''} ({percentage}%)
                             </Text>
                           </View>

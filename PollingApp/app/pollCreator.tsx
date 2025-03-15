@@ -95,8 +95,10 @@ const localStyles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#f2f2f2',
   },
+  // Update or remove the primaryButton style to use the global blueButton
   primaryButton: {
-    backgroundColor: '#4287f5',
+    // Use the global blue button style with additional properties
+    backgroundColor: '#094183', // Match navbar color
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -657,10 +659,10 @@ const PollScreen = () => {
                     }}
                   />
                   <TouchableOpacity
-                    style={localStyles.primaryButton}
+                    style={styles.blueButton} // Use global blue button style
                     onPress={() => setShowDatePicker(false)}
                   >
-                    <Text style={localStyles.primaryButtonText}>Done</Text>
+                    <Text style={styles.blueButtonText}>Done</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -688,10 +690,10 @@ const PollScreen = () => {
                     }}
                   />
                   <TouchableOpacity
-                    style={localStyles.primaryButton}
+                    style={styles.blueButton} // Use global blue button style
                     onPress={() => setShowTimePicker(false)}
                   >
-                    <Text style={localStyles.primaryButtonText}>Done</Text>
+                    <Text style={styles.blueButtonText}>Done</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -702,8 +704,8 @@ const PollScreen = () => {
         {/* Create Button */}
         <TouchableOpacity
           style={[
-            localStyles.primaryButton, 
-            { marginTop: 8, marginBottom: 80 },
+            styles.blueButton, // Use global blue button style
+            { marginTop: 8, marginBottom: 80, paddingVertical: 14 },
             isCreating && { opacity: 0.7 }
           ]}
           onPress={createPoll}
@@ -712,7 +714,7 @@ const PollScreen = () => {
           {isCreating ? (
             <ActivityIndicator color="#ffffff" size="small" />
           ) : (
-            <Text style={localStyles.primaryButtonText}>
+            <Text style={styles.blueButtonText}>
               Create Poll <Ionicons name="checkmark-circle" size={18} color="#fff" />
             </Text>
           )}

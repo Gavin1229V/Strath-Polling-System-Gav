@@ -31,9 +31,53 @@ const CreateElectionScreen = () => {
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [existingElections, setExistingElections] = useState<{[key: number]: boolean}>({});
+  const [checkingYears, setCheckingYears] = useState(true);
   
   const { user } = useAuth();
   const router = useRouter();
+
+  // Check for existing active elections
+  useEffect(() => {
+    checkExistingElections();
+  }, []);
+
+  // Function to check which year groups already have active elections
+  const checkExistingElections = async () => {
+    setCheckingYears(true);
+    try {
+      const response = await fetch(`${SERVER_IP}/api/elections`);
+      if (response.ok) {
+        const allElections = await response.json();
+        
+        // Create a map of year groups with active elections
+        const activeElectionsByYear: {[key: number]: boolean} = {};
+        allElections.forEach((election: any) => {
+          // Only consider elections that are not expired
+          if (election.is_expired === 0) {
+            activeElectionsByYear[election.year_group] = true;
+          }
+        });
+        
+        setExistingElections(activeElectionsByYear);
+        
+        // If the currently selected year already has an active election, 
+        // find the first available year to select instead
+        if (activeElectionsByYear[yearGroup]) {
+          for (let year = 1; year <= 5; year++) {
+            if (!activeElectionsByYear[year]) {
+              setYearGroup(year);
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking existing elections:", error);
+    } finally {
+      setCheckingYears(false);
+    }
+  };
 
   // Format date for display
   const formatDate = (date: Date) => {
@@ -43,13 +87,27 @@ const CreateElectionScreen = () => {
     });
   };
 
+  // Check if a year group already has an active election
+  const yearHasActiveElection = (year: number): boolean => {
+    return existingElections[year] === true;
+  };
+
   // Check for form validity
   const isFormValid = () => {
-    return title.trim() !== "" && yearGroup > 0;
+    return title.trim() !== "" && yearGroup > 0 && !yearHasActiveElection(yearGroup);
   };
 
   // Create the election
   const handleCreateElection = async () => {
+    // Check again if the year has an active election (in case something changed)
+    if (yearHasActiveElection(yearGroup)) {
+      Alert.alert(
+        "Year Already Has Election", 
+        `An active election for Year ${yearGroup} already exists. Only one active election per year group is allowed.`
+      );
+      return;
+    }
+
     if (!isFormValid()) {
       Alert.alert("Error", "Please fill in all required fields.");
       return;
@@ -106,7 +164,7 @@ const CreateElectionScreen = () => {
 
   return (
     <View style={styles.electionContainer}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         <Text style={styles.electionHeader}>Create Student Representative Election</Text>
         
         {/* Lecturer info card */}
@@ -121,99 +179,125 @@ const CreateElectionScreen = () => {
         }}>
           <Ionicons name="information-circle" size={24} color="#1976D2" style={{ marginRight: 10 }} />
           <Text style={{ color: "#1976D2", flex: 1 }}>
-            As a lecturer, you can create elections for specific year groups. 
-            Students will only be able to nominate themselves or vote in elections for their own year group.
+            As a lecturer, you can create elections for specific year groups.
+            Only one active election per year group is allowed.
           </Text>
         </View>
         
-        <View style={styles.electionForm}>
-          {/* Election Title */}
-          <Text style={styles.formLabel}>
-            Election Title <Text style={{ color: "#e53935" }}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.formField}
-            placeholder="Enter election title"
-            value={title}
-            onChangeText={setTitle}
-            maxLength={100}
-          />
-          
-          {/* Election Description */}
-          <Text style={styles.formLabel}>Description</Text>
-          <TextInput
-            style={[styles.formField, styles.formTextArea]}
-            placeholder="Enter election description (optional)"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={5}
-          />
-          
-          {/* Year Group Selection */}
-          <Text style={[styles.formLabel, { fontSize: 18, fontWeight: "700", marginTop: 10 }]}>
-            Year Group <Text style={{ color: "#e53935" }}>*</Text>
-          </Text>
-          <Text style={{ marginBottom: 10, color: "#666", fontStyle: "italic" }}>
-            Select which year group can participate in this election
-          </Text>
-          <TouchableOpacity
-            style={{
-              borderWidth: 1,
-              borderColor: "#1976D2",
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 16,
-              backgroundColor: "#E3F2FD",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-            onPress={() => setShowYearPicker(true)}
-          >
-            <Text style={{ fontSize: 16, fontWeight: "600", color: "#1976D2" }}>
-              Year {yearGroup}
+        {checkingYears ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color="#007AFF" />
+            <Text style={{ marginTop: 10, color: '#666' }}>Checking available year groups...</Text>
+          </View>
+        ) : (
+          <View style={styles.electionForm}>
+            {/* Election Title */}
+            <Text style={styles.formLabel}>
+              Election Title <Text style={{ color: "#e53935" }}>*</Text>
             </Text>
-            <Ionicons name="chevron-down" size={20} color="#1976D2" />
-          </TouchableOpacity>
+            <TextInput
+              style={styles.formField}
+              placeholder="Enter election title"
+              value={title}
+              onChangeText={setTitle}
+              maxLength={100}
+            />
+            
+            {/* Election Description */}
+            <Text style={styles.formLabel}>Description</Text>
+            <TextInput
+              style={[styles.formField, styles.formTextArea]}
+              placeholder="Enter election description (optional)"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={5}
+            />
+            
+            {/* Year Group Selection */}
+            <Text style={[styles.formLabel, { fontSize: 18, fontWeight: "700", marginTop: 10 }]}>
+              Year Group <Text style={{ color: "#e53935" }}>*</Text>
+            </Text>
+            <Text style={{ marginBottom: 10, color: "#666", fontStyle: "italic" }}>
+              Select which year group can participate in this election
+            </Text>
+            <TouchableOpacity
+              style={{
+                borderWidth: 1,
+                borderColor: "#1976D2",
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+                backgroundColor: "#E3F2FD",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+              onPress={() => setShowYearPicker(true)}
+            >
+              <Text style={{ fontSize: 16, fontWeight: "600", color: "#1976D2" }}>
+                Year {yearGroup}
+                {yearHasActiveElection(yearGroup) && " (Already has active election)"}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#1976D2" />
+            </TouchableOpacity>
 
-          {/* End Date Selection */}
-          <Text style={styles.formLabel}>Election End Date</Text>
-          <TouchableOpacity
-            style={{
-              borderWidth: 1,
-              borderColor: "#ddd",
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 16,
-              backgroundColor: "#fafafa",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text>{formatDate(endDate)}</Text>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
-          </TouchableOpacity>
-
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={[
-              styles.formSubmitButton,
-              !isFormValid() && { backgroundColor: "#ccc" },
-              submitting && { opacity: 0.7 },
-            ]}
-            onPress={handleCreateElection}
-            disabled={!isFormValid() || submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.formSubmitText}>Create Election</Text>
+            {/* Add a warning if all year groups have active elections */}
+            {Object.keys(existingElections).length >= 5 && (
+              <View style={{
+                backgroundColor: "#FFECB3",
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 16,
+                flexDirection: "row",
+                alignItems: "center"
+              }}>
+                <Ionicons name="warning" size={20} color="#FFA000" style={{ marginRight: 8 }} />
+                <Text style={{ color: "#795548", flex: 1 }}>
+                  All year groups already have active elections. Wait for an existing election to end before creating a new one.
+                </Text>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
+
+            {/* End Date Selection */}
+            <Text style={styles.formLabel}>Election End Date</Text>
+            <TouchableOpacity
+              style={{
+                borderWidth: 1,
+                borderColor: "#ddd",
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+                backgroundColor: "#fafafa",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text>{formatDate(endDate)}</Text>
+              <Ionicons name="calendar-outline" size={20} color="#666" />
+            </TouchableOpacity>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[
+                styles.blueButton,
+                (!isFormValid() || yearHasActiveElection(yearGroup)) && { backgroundColor: "#ccc", opacity: 0.7 },
+                submitting && { opacity: 0.7 },
+                { marginTop: 10, marginBottom: 16 }
+              ]}
+              onPress={handleCreateElection}
+              disabled={!isFormValid() || submitting || yearHasActiveElection(yearGroup)}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.blueButtonText}>Create Election</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Year Group Picker Modal */}
         {showYearPicker && (
@@ -243,13 +327,34 @@ const CreateElectionScreen = () => {
                   paddingVertical: 12,
                   borderBottomWidth: 1,
                   borderBottomColor: "#eee",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  opacity: yearHasActiveElection(year.value) ? 0.5 : 1
                 }}
                 onPress={() => {
-                  setYearGroup(year.value);
-                  setShowYearPicker(false);
+                  if (!yearHasActiveElection(year.value)) {
+                    setYearGroup(year.value);
+                    setShowYearPicker(false);
+                  } else {
+                    Alert.alert(
+                      "Year Unavailable", 
+                      `An active election for ${year.label} already exists. Only one active election per year group is allowed.`
+                    );
+                  }
                 }}
               >
                 <Text style={{ fontSize: 16 }}>{year.label}</Text>
+                {yearHasActiveElection(year.value) && (
+                  <View style={{
+                    backgroundColor: "#FFECB3",
+                    paddingVertical: 2,
+                    paddingHorizontal: 8,
+                    borderRadius: 12
+                  }}>
+                    <Text style={{ fontSize: 12, color: "#795548" }}>Has Active Election</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
             <TouchableOpacity
@@ -320,16 +425,10 @@ const CreateElectionScreen = () => {
               }}
             />
             <TouchableOpacity
-              style={{
-                marginTop: 16,
-                padding: 12,
-                backgroundColor: "#007AFF",
-                borderRadius: 8,
-                alignItems: "center",
-              }}
+              style={styles.blueButton}
               onPress={() => setShowDatePicker(false)}
             >
-              <Text style={{ color: "#fff", fontWeight: "600" }}>Done</Text>
+              <Text style={styles.blueButtonText}>Done</Text>
             </TouchableOpacity>
           </View>
         )}

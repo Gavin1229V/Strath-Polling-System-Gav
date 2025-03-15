@@ -24,7 +24,7 @@ const LoginPage: React.FC = () => {
     setUser({ 
       token: data.token,
       email: userDetails.email,
-      role: userDetails.role,
+      role: userDetails.role, // This now correctly comes from the users table via userDetails
       login_id: userDetails.login_id,
       user_id: userDetails.user_id,
       password, 

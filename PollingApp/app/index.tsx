@@ -3,16 +3,19 @@ import { View, Text, TouchableOpacity, ImageBackground, ActivityIndicator } from
 import { useRouter } from "expo-router";
 import { Asset } from "expo-asset";
 import authStyles from "../styles/authStyles";
+
 const bgImage = require("../assets/images/StrathBG_Index.jpg");
 
 const StartPage = () => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const router = useRouter();
 
+  // Simplified asset loading
   useEffect(() => {
     Asset.loadAsync(bgImage).then(() => setImageLoaded(true));
   }, []);
 
+  // Early return pattern for loading state
   if (!imageLoaded) {
     return (
       <View style={authStyles.bg}>
@@ -21,21 +24,26 @@ const StartPage = () => {
     );
   }
 
+  // Main component rendering
   return (
     <ImageBackground source={bgImage} style={authStyles.bg}>
       <View style={authStyles.container}>
-        {/* Grey box container */}
         <View style={authStyles.greyBox}>
           <Text style={authStyles.title}>Welcome to Simpoll!</Text>
-          <TouchableOpacity style={authStyles.button} onPress={() => router.push("./login")}>
-            <Text style={authStyles.buttonText}>Login</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={authStyles.button} onPress={() => router.push("./registerPage")}>
-            <Text style={authStyles.buttonText}>Register</Text>
-          </TouchableOpacity>
+          
+          {/* Navigation buttons */}
+          {['login', 'registerPage'].map((route, i) => (
+            <TouchableOpacity 
+              key={route}
+              style={authStyles.button} 
+              onPress={() => router.push(`./${route}`)}
+            >
+              <Text style={authStyles.buttonText}>{i === 0 ? 'Login' : 'Register'}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
-      <Text style={authStyles.credit}>A 4th year project by Gavin Verma            </Text>
+      <Text style={authStyles.credit}>A 4th year project by Gavin Verma</Text>
     </ImageBackground>
   );
 };

@@ -21,8 +21,10 @@ interface Election {
   created_at: string;
   end_date: string;
   candidate_count: number;
-  creator_email?: string; // Changed to email instead of first_name/last_name
+  creator_email?: string;
   year_group: number;
+  is_expired: number;
+  winner_id: number | null;
 }
 
 const ElectionsScreen = () => {
@@ -118,54 +120,71 @@ const ElectionsScreen = () => {
       
       {/* Year filter - only for lecturers */}
       {isLecturer && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScrollView}
-        >
-          <TouchableOpacity
-            style={[
-              styles.filterButton, 
-              activeYearFilter === null && styles.activeFilterButton,
-              { height: 36 } // Add a fixed height to control button size
-            ]}
-            onPress={() => setActiveYearFilter(null)}
+        <View style={{
+          marginBottom: 10,
+          backgroundColor: '#F2F4F8',
+          borderRadius: 12,
+          paddingVertical: 10,
+        }}>
+          <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#555' }}>
+              <Ionicons name="filter-outline" size={16} color="#555" /> Filter by Year:
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 12 }}
           >
-            <Text style={[
-              styles.filterButtonText,
-              activeYearFilter === null && styles.activeFilterText
-            ]}>All</Text>
-          </TouchableOpacity>
-          
-          {yearGroups.map((year) => (
             <TouchableOpacity
-              key={year}
               style={[
-                styles.filterButton,
-                activeYearFilter === year && styles.activeFilterButton,
-                { height: 36 } // Add a fixed height to control button size
+                styles.yearFilterChip,
+                activeYearFilter === null && styles.yearFilterChipActive,
               ]}
-              onPress={() => setActiveYearFilter(year)}
+              onPress={() => setActiveYearFilter(null)}
             >
               <Text style={[
-                styles.filterButtonText,
-                activeYearFilter === year && styles.activeFilterText
-              ]}>Year {year}</Text>
+                styles.yearFilterChipText,
+                activeYearFilter === null && styles.yearFilterChipTextActive
+              ]}>All Years</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+            
+            {yearGroups.map((year) => (
+              <TouchableOpacity
+                key={year}
+                style={[
+                  styles.yearFilterChip,
+                  activeYearFilter === year && styles.yearFilterChipActive,
+                ]}
+                onPress={() => setActiveYearFilter(year)}
+              >
+                <Text style={[
+                  styles.yearFilterChipText,
+                  activeYearFilter === year && styles.yearFilterChipTextActive
+                ]}>Year {year}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       )}
       
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        contentContainerStyle={{ paddingTop: 0 }}
       >
         {filteredElections.length > 0 ? (
           filteredElections.map((election) => (
             <TouchableOpacity
               key={election.id}
-              style={styles.electionCard}
+              style={[
+                styles.electionCard,
+                election.is_expired && election.winner_id ? { 
+                  borderLeftWidth: 4, 
+                  borderLeftColor: '#4CAF50' 
+                } : undefined
+              ]}
               onPress={() => viewElection(election)}
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -184,7 +203,7 @@ const ElectionsScreen = () => {
               
               <View style={styles.electionDetail}>
                 <Ionicons name="calendar-outline" size={16} color="#666" style={{ marginRight: 6 }} />
-                <Text>Ends: {formatDate(election.end_date)}</Text>
+                <Text>{election.is_expired ? "Ended: " : "Ends: "}{formatDate(election.end_date)}</Text>
               </View>
               
               {/* Show creator info using email parsing */}
@@ -196,22 +215,31 @@ const ElectionsScreen = () => {
               )}
               
               <View style={styles.electionMetaContainer}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Ionicons name="people-outline" size={16} color="#666" style={{ marginRight: 4 }} />
-                  <Text style={{ color: "#666", fontSize: 13 }}>
-                    {election.candidate_count} candidate{election.candidate_count !== 1 ? "s" : ""}
-                  </Text>
-                </View>
+                {!election.is_expired ? (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Ionicons name="people-outline" size={16} color="#666" style={{ marginRight: 4 }} />
+                    <Text style={{ color: "#666", fontSize: 13 }}>
+                      {election.candidate_count} candidate{election.candidate_count !== 1 ? "s" : ""}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Ionicons name="trophy-outline" size={16} color="#4CAF50" style={{ marginRight: 4 }} />
+                    <Text style={{ color: "#4CAF50", fontSize: 13, fontWeight: '600' }}>
+                      Winner Announced
+                    </Text>
+                  </View>
+                )}
                 
                 <Text
                   style={[
                     styles.electionStatus,
-                    isElectionOpen(election.end_date)
+                    !election.is_expired
                       ? styles.electionStatusOpen
                       : styles.electionStatusClosed,
                   ]}
                 >
-                  {isElectionOpen(election.end_date) ? "OPEN" : "CLOSED"}
+                  {!election.is_expired ? "OPEN" : "COMPLETED"}
                 </Text>
               </View>
             </TouchableOpacity>

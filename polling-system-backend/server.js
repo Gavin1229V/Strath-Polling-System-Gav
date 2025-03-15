@@ -9,6 +9,7 @@ const compression = require("compression");
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
 const NodeCache = require("node-cache");
+const { getConnection } = require("./db"); // Add this import for getConnection
 
 const router = require("./pollRouter");
 const pollRouter = require("./pollRouter");
@@ -354,3 +355,67 @@ function shutdown() {
     process.exit(1);
   }, 10000);
 }
+
+// Helper function to update winner roles for expired elections
+async function updateExpiredElectionWinners() {
+  try {
+    const connection = await getConnection();
+    
+    // Get all expired elections that haven't had their winners updated yet
+    const [expiredElections] = await connection.query(`
+      SELECT id 
+      FROM elections 
+      WHERE end_date < NOW() 
+      AND (winner_updated IS NULL OR winner_updated = 0)
+    `);
+    
+    if (expiredElections.length === 0) {
+      return console.log('No newly expired elections found on server startup');
+    }
+    
+    let updatedCount = 0;
+    
+    // Process each expired election
+    for (const election of expiredElections) {
+      // Find the winner for this election
+      const [winners] = await connection.query(`
+        SELECT c.user_id, COUNT(v.id) AS vote_count
+        FROM election_candidates c
+        LEFT JOIN election_votes v ON c.id = v.candidate_id
+        WHERE c.election_id = ?
+        GROUP BY c.user_id
+        ORDER BY vote_count DESC
+        LIMIT 1
+      `, [election.id]);
+      
+      // If we found a winner with at least one vote
+      if (winners.length > 0 && winners[0].vote_count > 0) {
+        const winnerId = winners[0].user_id;
+        
+        // Update the winner's role to 2 (representative)
+        await connection.query(`
+          UPDATE users 
+          SET role = 2 
+          WHERE user_id = ?
+        `, [winnerId]);
+        
+        // Mark this election as having updated its winner
+        await connection.query(`
+          UPDATE elections 
+          SET winner_updated = 1 
+          WHERE id = ?
+        `, [election.id]);
+        
+        updatedCount++;
+        console.log(`[INFO] Updated user ${winnerId} role to representative after winning election ${election.id}`);
+      }
+    }
+    
+    console.log(`Processed ${expiredElections.length} expired elections, updated ${updatedCount} winners to representative role`);
+  } catch (error) {
+    console.error("Error checking expired elections on startup:", error);
+  }
+}
+
+// Call this function on server startup
+updateExpiredElectionWinners();

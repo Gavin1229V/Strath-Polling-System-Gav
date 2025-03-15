@@ -11,7 +11,14 @@ router.get("/", async (req, res) => {
       SELECT e.*, 
         COUNT(c.id) AS candidate_count,
         u.email AS creator_email,
-        e.year_group
+        e.year_group,
+        e.end_date < NOW() AS is_expired,
+        (SELECT c2.id FROM election_candidates c2 
+         LEFT JOIN election_votes v ON c2.id = v.candidate_id 
+         WHERE c2.election_id = e.id 
+         GROUP BY c2.id 
+         ORDER BY COUNT(v.id) DESC 
+         LIMIT 1) AS winner_id
       FROM elections e
       LEFT JOIN election_candidates c ON e.id = c.election_id
       LEFT JOIN users u ON e.created_by = u.user_id
@@ -31,7 +38,7 @@ router.get("/:id", async (req, res) => {
   try {
     const connection = await getConnection();
     const [elections] = await connection.query(`
-      SELECT * FROM elections WHERE id = ?
+      SELECT *, end_date < NOW() as is_expired FROM elections WHERE id = ?
     `, [req.params.id]);
     
     if (elections.length === 0) {
@@ -39,26 +46,88 @@ router.get("/:id", async (req, res) => {
     }
     
     const election = elections[0];
+    const isExpired = election.is_expired === 1;
     
-    const [candidates] = await connection.query(`
-      SELECT c.*, u.email, u.profile_picture, u.year_group,
-        COUNT(v.id) AS vote_count
-      FROM election_candidates c
-      JOIN users u ON c.user_id = u.user_id
-      LEFT JOIN election_votes v ON c.id = v.candidate_id
-      WHERE c.election_id = ?
-      GROUP BY c.id
-      ORDER BY vote_count DESC
-    `, [req.params.id]);
-    
-    // Convert profile pictures to base64 if needed
-    candidates.forEach(candidate => {
-      if (candidate.profile_picture && Buffer.isBuffer(candidate.profile_picture)) {
-        candidate.profile_picture = "data:image/png;base64," + candidate.profile_picture.toString("base64");
+    // For expired elections, only get the winning candidate
+    if (isExpired) {
+      const [candidates] = await connection.query(`
+        SELECT c.*, u.email, u.profile_picture, u.year_group,
+          COUNT(v.id) AS vote_count
+        FROM election_candidates c
+        JOIN users u ON c.user_id = u.user_id
+        LEFT JOIN election_votes v ON c.id = v.candidate_id
+        WHERE c.election_id = ?
+        GROUP BY c.id
+        ORDER BY vote_count DESC
+        LIMIT 1
+      `, [req.params.id]);
+
+      // Convert profile pictures to base64 if needed
+      candidates.forEach(candidate => {
+        if (candidate.profile_picture && Buffer.isBuffer(candidate.profile_picture)) {
+          candidate.profile_picture = "data:image/png;base64," + candidate.profile_picture.toString("base64");
+        }
+      });
+      
+      election.candidates = candidates;
+      election.winner = candidates.length > 0 ? candidates[0] : null;
+      
+      // Update the winner's role to 2 (representative) if we have a winner
+      // and they haven't been marked as winner yet
+      if (election.winner && candidates.length > 0) {
+        // Check if the winner already has role set to 2
+        const [winnerRole] = await connection.query(`
+          SELECT role, winner_updated 
+          FROM users u
+          LEFT JOIN elections e ON e.id = ? 
+          WHERE u.user_id = ?
+        `, [election.id, candidates[0].user_id]);
+        
+        // If winner needs role update and hasn't been marked as updated for this election
+        if (winnerRole.length > 0 && 
+            winnerRole[0].role !== 2 && 
+            !winnerRole[0].winner_updated) {
+          
+          // Update the user role to 2 (representative)
+          await connection.query(`
+            UPDATE users 
+            SET role = 2 
+            WHERE user_id = ?
+          `, [candidates[0].user_id]);
+          
+          // Mark this election as having updated its winner
+          await connection.query(`
+            UPDATE elections 
+            SET winner_updated = 1 
+            WHERE id = ?
+          `, [election.id]);
+          
+          console.log(`[INFO] Updated user ${candidates[0].user_id} role to representative after winning election ${election.id}`);
+        }
       }
-    });
+    } else {
+      // For active elections, get all candidates
+      const [candidates] = await connection.query(`
+        SELECT c.*, u.email, u.profile_picture, u.year_group,
+          COUNT(v.id) AS vote_count
+        FROM election_candidates c
+        JOIN users u ON c.user_id = u.user_id
+        LEFT JOIN election_votes v ON c.id = v.candidate_id
+        WHERE c.election_id = ?
+        GROUP BY c.id
+        ORDER BY vote_count DESC
+      `, [req.params.id]);
+      
+      // Convert profile pictures to base64 if needed
+      candidates.forEach(candidate => {
+        if (candidate.profile_picture && Buffer.isBuffer(candidate.profile_picture)) {
+          candidate.profile_picture = "data:image/png;base64," + candidate.profile_picture.toString("base64");
+        }
+      });
+      
+      election.candidates = candidates;
+    }
     
-    election.candidates = candidates;
     res.json(election);
   } catch (error) {
     console.error("Error fetching election:", error);
@@ -92,6 +161,18 @@ router.post("/", async (req, res) => {
     }
     
     const connection = await getConnection();
+    
+    // Check if an active election already exists for this year group
+    const [existingElections] = await connection.query(
+      "SELECT * FROM elections WHERE year_group = ? AND end_date > NOW()",
+      [year_group]
+    );
+    
+    if (existingElections.length > 0) {
+      return res.status(400).json({ 
+        error: `An active election for Year ${year_group} already exists. Only one active election per year group is allowed.`
+      });
+    }
     
     // Only verify the user exists (removed role check)
     const [userCheck] = await connection.query(
@@ -335,6 +416,70 @@ router.get("/user/yearGroup", async (req, res) => {
     res.json({ yearGroup: userDetails[0].year_group });
   } catch (error) {
     console.error("Error fetching user year group:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add this new endpoint to handle election endings and role updates
+router.post("/check-expired-elections", async (req, res) => {
+  try {
+    const connection = await getConnection();
+    
+    // Get all expired elections that haven't had their winners updated yet
+    const [expiredElections] = await connection.query(`
+      SELECT id 
+      FROM elections 
+      WHERE end_date < NOW() 
+      AND (winner_updated IS NULL OR winner_updated = 0)
+    `);
+    
+    if (expiredElections.length === 0) {
+      return res.json({ message: "No newly expired elections found" });
+    }
+    
+    let updatedCount = 0;
+    
+    // Process each expired election
+    for (const election of expiredElections) {
+      // Find the winner for this election
+      const [winners] = await connection.query(`
+        SELECT c.user_id, COUNT(v.id) AS vote_count
+        FROM election_candidates c
+        LEFT JOIN election_votes v ON c.id = v.candidate_id
+        WHERE c.election_id = ?
+        GROUP BY c.user_id
+        ORDER BY vote_count DESC
+        LIMIT 1
+      `, [election.id]);
+      
+      // If we found a winner with at least one vote
+      if (winners.length > 0 && winners[0].vote_count > 0) {
+        const winnerId = winners[0].user_id;
+        
+        // Update the winner's role to 2 (representative)
+        await connection.query(`
+          UPDATE users 
+          SET role = 2 
+          WHERE user_id = ?
+        `, [winnerId]);
+        
+        // Mark this election as having updated its winner
+        await connection.query(`
+          UPDATE elections 
+          SET winner_updated = 1 
+          WHERE id = ?
+        `, [election.id]);
+        
+        updatedCount++;
+        console.log(`[INFO] Updated user ${winnerId} role to representative after winning election ${election.id}`);
+      }
+    }
+    
+    res.json({ 
+      message: `Processed ${expiredElections.length} expired elections, updated ${updatedCount} winners to representative role` 
+    });
+  } catch (error) {
+    console.error("Error checking expired elections:", error);
     res.status(500).json({ error: error.message });
   }
 });

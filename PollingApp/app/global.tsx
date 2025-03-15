@@ -35,7 +35,7 @@ let socketInstance: Socket | null = null;
 
 // Track last poll fetch time to prevent too many requests
 let lastPollFetchTime = 0;
-const MIN_FETCH_INTERVAL = 5000; // 5 seconds minimum between fetches
+const MIN_FETCH_INTERVAL = 10000; // Increased from 5000 to 10000 (10 seconds minimum between fetches)
 
 // Get or create socket with connection management and better error handling
 export const getSocket = (): Socket => {
@@ -102,7 +102,7 @@ export const fetchPolls = async (
 ): Promise<Poll[]> => {
   const now = Date.now();
   
-  // Rate limiting on the client side
+  // Rate limiting on the client side - stricter throttling
   if (!forceRefresh && now - lastPollFetchTime < MIN_FETCH_INTERVAL) {
     console.log("Throttling poll requests - too soon since last request");
     
@@ -114,7 +114,7 @@ export const fetchPolls = async (
     }
   }
   
-  // Return cached data if available and not expired
+  // Return cached data if available and not expired - longer cache lifetime
   if (!forceRefresh && pollsCache.data && now - pollsCache.timestamp < pollsCache.expiresIn) {
     console.log("Using cached polls data");
     setPollsState(pollsCache.data);
@@ -124,32 +124,40 @@ export const fetchPolls = async (
   // Update the last fetch time
   lastPollFetchTime = now;
   
-  // Implement exponential backoff retry logic
-  const maxRetries = 3;
+  // Implement improved exponential backoff retry logic
+  const maxRetries = 5; // Increased from 3 to 5
   let retryCount = 0;
-  let delay = 1000; // Start with 1s delay
+  let delay = 2000; // Start with 2s delay instead of 1s
+  
+  // Add jitter to prevent request clustering
+  const getJitteredDelay = (baseDelay: number) => {
+    return baseDelay + Math.floor(Math.random() * (baseDelay * 0.3));
+  };
 
   while (retryCount < maxRetries) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout, increased from 10s
 
+      console.log(`Fetching polls, attempt ${retryCount + 1}/${maxRetries}`);
       const response = await fetch(`${SERVER_IP}/api/polls`, {
         signal: controller.signal,
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache', // Add cache control header
         }
       });
       
       clearTimeout(timeoutId);
 
       if (response.status === 429) {
-        // Rate limited - wait longer before retry
+        // Rate limited - wait longer before retry with jitter
+        const jitteredDelay = getJitteredDelay(delay);
         retryCount++;
+        console.log(`Rate limited. Retrying in ${jitteredDelay}ms (${retryCount}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, jitteredDelay));
         delay *= 2; // Exponential backoff
-        console.log(`Rate limited. Retrying in ${delay}ms (${retryCount}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
 
@@ -167,13 +175,15 @@ export const fetchPolls = async (
         throw new Error("Invalid server response format");
       }
       
-      // Update cache
+      // Update cache with longer expiration
       pollsCache.data = data;
       pollsCache.timestamp = now;
+      pollsCache.expiresIn = 60000; // 60 seconds cache (doubled from 30 seconds)
       
       setPollsState(data);
       return data;
     } catch (error: any) {
+      const jitteredDelay = getJitteredDelay(delay);
       retryCount++;
       
       if (error.name === 'AbortError') {
@@ -192,9 +202,10 @@ export const fetchPolls = async (
         throw new Error(`Failed to fetch polls after ${maxRetries} attempts`);
       }
       
-      // Wait before retrying with exponential backoff
+      // Wait before retrying with exponential backoff and jitter
+      console.log(`Retrying in ${jitteredDelay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, jitteredDelay));
       delay *= 2;
-      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   
@@ -207,6 +218,84 @@ export const fetchPolls = async (
   }
   
   throw new Error("Failed to fetch polls after maximum retries");
+};
+
+/**
+ * Processes a profile picture string into a valid URI for display
+ * Handles different formats: base64, URLs, and relative paths
+ */
+export const processProfilePicture = (profilePic: string | null | undefined): string | null => {
+  if (!profilePic) return null;
+  
+  try {
+    // Handle string cleanup
+    let pic = profilePic.trim();
+    
+    // Remove quotes if present
+    if (pic.startsWith(`"`) && pic.endsWith(`"`)) {
+      pic = pic.slice(1, -1);
+    }
+    
+    // Return as-is if it's already a data URI or absolute URL
+    if (pic.startsWith("data:") || pic.startsWith("http://") || pic.startsWith("https://")) {
+      return pic;
+    } 
+    
+    // Otherwise, treat as a relative path and prepend SERVER_IP
+    return `${SERVER_IP}/${pic}`;
+  } catch (error) {
+    console.error("Error processing profile picture:", error);
+    return null;
+  }
+};
+
+// Check if base64 image is too large
+export const isBase64TooLarge = (base64String: string): boolean => {
+  return base64String.length > 1024 * 1024; // 1MB limit
+};
+
+export const convertToBase64Uri = (pic: any): string => {
+  if (!pic) return "";
+  
+  // Handle if already a valid data URI
+  if (typeof pic === "string") {
+    if (pic.startsWith("data:")) return pic;
+    
+    // Check if the string is too large
+    if (isBase64TooLarge(pic)) {
+      console.warn("Profile picture base64 string is too large, using placeholder");
+      return "";
+    }
+    
+    return "data:image/jpeg;base64," + pic;
+  }
+  
+  // Handle binary data
+  if (pic.data) {
+    try {
+      let byteArray: Uint8Array;
+      if (pic.data instanceof Uint8Array) {
+        byteArray = pic.data;
+      } else if (Array.isArray(pic.data)) {
+        byteArray = new Uint8Array(pic.data);
+      } else {
+        byteArray = new Uint8Array(Object.values(pic.data));
+      }
+      
+      // Check if the byte array is too large
+      if (byteArray.length > 1024 * 1024) {
+        console.warn("Profile picture data is too large, using placeholder");
+        return "";
+      }
+      
+      const base64String = Buffer.from(byteArray).toString("base64");
+      return "data:image/jpeg;base64," + base64String;
+    } catch (e) {
+      console.error("Error processing picture data:", e);
+      return "";
+    }
+  }
+  return "";
 };
 
 export default{}

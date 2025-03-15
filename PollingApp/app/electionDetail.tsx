@@ -37,6 +37,8 @@ interface ElectionDetail {
   end_date: string;
   year_group: number;
   candidates: Candidate[];
+  winner?: Candidate;
+  is_expired?: boolean;
 }
 
 const ElectionDetailScreen = () => {
@@ -269,6 +271,11 @@ const ElectionDetailScreen = () => {
     }
   };
 
+  // Check if election is expired
+  const isElectionExpired = (election: ElectionDetail) => {
+    return new Date(election.end_date) < new Date();
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -293,17 +300,19 @@ const ElectionDetailScreen = () => {
           <Text style={styles.electionTitle}>{election.title}</Text>
           
           <View style={styles.electionDetail}>
-            <Ionicons name="school-outline" size={16} color="#666" style={{ marginRight: 6 }} />
-            <Text>{election.class_code} (Year {election.year_group})</Text>
+            <Ionicons name="school-outline" size={18} color="#555" style={{ marginRight: 8 }} />
+            <Text style={{fontSize: 15, color: "#444"}}>{election.class_code} (Year {election.year_group})</Text>
           </View>
           
           <View style={styles.electionDetail}>
-            <Ionicons name="calendar-outline" size={16} color="#666" style={{ marginRight: 6 }} />
-            <Text>Ends: {formatDate(election.end_date)}</Text>
+            <Ionicons name="calendar-outline" size={18} color="#555" style={{ marginRight: 8 }} />
+            <Text style={{fontSize: 15, color: "#444"}}>
+              {isElectionExpired(election) ? "Ended: " : "Ends: "}{formatDate(election.end_date)}
+            </Text>
           </View>
           
           {election.description && (
-            <View style={{ marginTop: 12 }}>
+            <View style={{ marginTop: 14, marginBottom: 4 }}>
               <Text style={styles.electionDescription}>{election.description}</Text>
             </View>
           )}
@@ -315,67 +324,134 @@ const ElectionDetailScreen = () => {
                 {election.candidates.length} candidate{election.candidates.length !== 1 ? "s" : ""}
               </Text>
             </View>
+            
+            {isElectionExpired(election) && (
+              <View style={{
+                backgroundColor: '#4CAF50',
+                paddingVertical: 4,
+                paddingHorizontal: 8,
+                borderRadius: 4
+              }}>
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>COMPLETED</Text>
+              </View>
+            )}
           </View>
         </View>
         
         <View style={{ marginTop: 16 }}>
-          <Text style={styles.electionHeader}>Candidates</Text>
-          
-          {election.candidates.length > 0 ? (
-            election.candidates.map((candidate) => (
-              <View key={candidate.id} style={styles.candidateCard}>
-                {candidate.profile_picture ? (
-                  <Image
-                    source={{ uri: candidate.profile_picture }}
-                    style={styles.candidateAvatar}
-                  />
-                ) : (
-                  <View style={[styles.candidateAvatar, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
-                    <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#555' }}>
-                      {getCandidateInitials(candidate)}
+          {isElectionExpired(election) ? (
+            // Show winner section for expired elections
+            <>
+              <Text style={[styles.electionHeader, {marginBottom: 14, fontSize: 20}]}>Election Winner</Text>
+              
+              {election.candidates.length > 0 ? (
+                <View key={election.candidates[0].id} style={[styles.candidateCard, {backgroundColor: '#E8F5E9', borderColor: '#81C784'}]}>
+                  {election.candidates[0].profile_picture ? (
+                    <Image
+                      source={{ uri: election.candidates[0].profile_picture }}
+                      style={[styles.candidateAvatar, { borderColor: '#43A047' }]}
+                    />
+                  ) : (
+                    <View style={[styles.candidateAvatar, { backgroundColor: '#C8E6C9', justifyContent: 'center', alignItems: 'center', borderColor: '#43A047' }]}>
+                      <Text style={{ fontWeight: 'bold', fontSize: 18, color: '#2E7D32' }}>
+                        {getCandidateInitials(election.candidates[0])}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  <View style={styles.candidateInfo}>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text style={[styles.candidateName, {color: '#2E7D32'}]}>
+                        {getCandidateName(election.candidates[0])}
+                      </Text>
+                      <View style={{
+                        backgroundColor: '#4CAF50',
+                        paddingVertical: 2,
+                        paddingHorizontal: 6,
+                        borderRadius: 12,
+                        marginLeft: 8
+                      }}>
+                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 10 }}>WINNER</Text>
+                      </View>
+                    </View>
+                    
+                    <Text style={styles.candidateStatement}>{election.candidates[0].statement}</Text>
+                    
+                    <Text style={[styles.candidateVoteCount, {color: '#2E7D32', fontWeight: '600'}]}>
+                      {election.candidates[0].vote_count} vote{election.candidates[0].vote_count !== 1 ? "s" : ""}
                     </Text>
                   </View>
-                )}
-                
-                <View style={styles.candidateInfo}>
-                  <Text style={styles.candidateName}>
-                    {getCandidateName(candidate)}
-                  </Text>
-                  
-                  <Text style={styles.candidateStatement}>{candidate.statement}</Text>
-                  
-                  <Text style={styles.candidateVoteCount}>
-                    {candidate.vote_count} vote{candidate.vote_count !== 1 ? "s" : ""}
-                  </Text>
                 </View>
-                
-                {/* Show vote button only if user hasn't voted for anyone yet */}
-                {votedFor === null && (
-                  <TouchableOpacity
-                    style={styles.voteButton}
-                    onPress={() => voteForCandidate(candidate.id)}
-                  >
-                    <Text style={styles.voteButtonText}>Vote</Text>
-                  </TouchableOpacity>
-                )}
-                
-                {/* Show voted badge only for the candidate the user voted for */}
-                {votedFor === candidate.id && (
-                  <View style={styles.votedBadge}>
-                    <Text style={styles.votedText}>Voted</Text>
-                  </View>
-                )}
-              </View>
-            ))
+              ) : (
+                <Text style={{ textAlign: "center", color: "#666", padding: 20 }}>
+                  No candidates participated in this election.
+                </Text>
+              )}
+            </>
           ) : (
-            <Text style={{ textAlign: "center", color: "#666", padding: 20 }}>
-              No candidates yet. Be the first to apply!
-            </Text>
+            // Show all candidates for active elections
+            <>
+              <Text style={[styles.electionHeader, {marginBottom: 14, fontSize: 20}]}>Candidates</Text>
+              
+              {election.candidates.length > 0 ? (
+                election.candidates.map((candidate) => (
+                  // Existing candidate display code
+                  <View key={candidate.id} style={styles.candidateCard}>
+                    {/* ... existing candidate display code ... */}
+                    {candidate.profile_picture ? (
+                      <Image
+                        source={{ uri: candidate.profile_picture }}
+                        style={styles.candidateAvatar}
+                      />
+                    ) : (
+                      <View style={[styles.candidateAvatar, { backgroundColor: '#E3F2FD', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Text style={{ fontWeight: 'bold', fontSize: 18, color: '#1976D2' }}>
+                          {getCandidateInitials(candidate)}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    <View style={styles.candidateInfo}>
+                      <Text style={styles.candidateName}>
+                        {getCandidateName(candidate)}
+                      </Text>
+                      
+                      <Text style={styles.candidateStatement}>{candidate.statement}</Text>
+                      
+                      <Text style={styles.candidateVoteCount}>
+                        {candidate.vote_count} vote{candidate.vote_count !== 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                    
+                    {/* Show vote button only if user hasn't voted for anyone yet */}
+                    {votedFor === null && (
+                      <TouchableOpacity
+                        style={styles.voteButton}
+                        onPress={() => voteForCandidate(candidate.id)}
+                      >
+                        <Text style={styles.voteButtonText}>Vote</Text>
+                      </TouchableOpacity>
+                    )}
+                    
+                    {/* Show voted badge only for the candidate the user voted for */}
+                    {votedFor === candidate.id && (
+                      <View style={styles.votedBadge}>
+                        <Text style={styles.votedText}>Voted</Text>
+                      </View>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={{ textAlign: "center", color: "#666", padding: 20 }}>
+                  No candidates yet. Be the first to apply!
+                </Text>
+              )}
+            </>
           )}
         </View>
         
-        {/* Apply as candidate button - no longer checks role or if election is open */}
-        {!hasApplied && (
+        {/* Apply as candidate button - only shown for active elections */}
+        {!isElectionExpired(election) && !hasApplied && (
           <View style={{ marginTop: 20, marginBottom: 40 }}>
             {!showApplyForm ? (
               <TouchableOpacity
@@ -451,8 +527,8 @@ const ElectionDetailScreen = () => {
           </View>
         )}
         
-        {/* If the user has already applied, show a message */}
-        {hasApplied && (
+        {/* If the user has already applied, show a message - only for active elections */}
+        {!isElectionExpired(election) && hasApplied && (
           <View style={{ 
             backgroundColor: "#e8f5e9",
             padding: 16,

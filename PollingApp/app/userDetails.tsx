@@ -14,6 +14,7 @@ interface AuthUser {
   token: string;
   profile_picture?: string; // Added optional profile_picture property
   classes?: string; // Added property to store user classes
+  year_group?: number; // Added property to store user's academic year
 }
 
 interface AuthContextType {
@@ -97,16 +98,12 @@ export const useLastName = () => {
 // Utility functions for extracting names from any email
 export const getFirstNameFromEmail = (email: string): string => {
   const parts = email.split(".");
-  if (parts[0]) {
-    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-  }
-  return "";
+  return parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : "";
 };
 
 export const getLastNameFromEmail = (email: string): string => {
   const parts = email.split(".");
-  if (parts.length > 1 && parts[1]) {
-    // Extract the part before @ if present
+  if (parts.length > 1) {
     const lastNamePart = parts[1].split("@")[0];
     return lastNamePart.charAt(0).toUpperCase() + lastNamePart.slice(1);
   }
