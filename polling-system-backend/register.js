@@ -48,7 +48,7 @@ const sendVerificationEmail = async (email, loginId, verificationKey) => {
 const registerAndSendEmail = async (email, password, role = 1) => {
   const connection = await getConnection();
 
-  // Override the role based on email domain.
+  // Set role based on email domain
   const emailLower = email.toLowerCase();
   if (emailLower.endsWith("@uni.strath.ac.uk")) {
     role = 1; // Student
@@ -56,20 +56,18 @@ const registerAndSendEmail = async (email, password, role = 1) => {
     role = 3; // Lecturer
   }
 
-  // Generate a unique 8-digit user_id.
   const userId = generateUniqueUserId();
   const verificationKey = crypto.randomBytes(16).toString("hex");
 
   try {
     await connection.beginTransaction();
 
-    // Insert the new user with the unique user_id and verification key.
-    // Removed role from logins table
+    // Insert into logins table
     const query = `INSERT INTO logins (user_id, email, password, is_verified, verification_key) VALUES (?, ?, ?, 0, ?)`;
     const [result] = await connection.query(query, [userId, email, password, verificationKey]);
     const loginId = result.insertId;
 
-    // Insert initial data into users table with role
+    // Insert into users table
     const usersQuery = `INSERT INTO users (user_id, email, role) VALUES (?, ?, ?)`;
     await connection.query(usersQuery, [userId, email, role]);
 

@@ -374,8 +374,6 @@ io.on("connection", async (socket) => {
     }
   }
 
-  // Vote throttling
-  const voteThrottle = {};
   
   socket.on("disconnect", () => {
     connectionCounter--;

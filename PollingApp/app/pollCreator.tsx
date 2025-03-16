@@ -9,14 +9,17 @@ import {
   Platform,
   StyleSheet,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { Picker } from '@react-native-picker/picker';
 import { fetchPolls, getSocket } from "./global";
 import { SERVER_IP } from "./config";
 import { useFirstName, useLastName, useAuth, useUserClasses } from "./userDetails";
 import { Poll } from "./global";
 import styles from "../styles/styles"; // Use global styles
-import { Ionicons } from '@expo/vector-icons'; // Make sure to install this if not already installed
+import { Ionicons } from '@expo/vector-icons';
 
 ////////////////////////////////////////////////////////////////////////////////
 // Compute default expiry value (one day ahead)
@@ -57,6 +60,7 @@ const localStyles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 16,
+    position: 'relative', // Add position relative to contain absolute positioned dropdown
   },
   inputLabel: {
     fontSize: 14,
@@ -126,7 +130,7 @@ const localStyles = StyleSheet.create({
     fontSize: 15,
     marginLeft: 6,
   },
-  dropdownSelect: {
+  pickerButton: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
@@ -136,34 +140,41 @@ const localStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  dropdownMenu: {
-    position: 'absolute',
-    top: 45,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    zIndex: 100,
-    maxHeight: 200,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+  pickerModal: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  dropdownItem: {
-    padding: 12,
+  pickerContainer: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    maxHeight: '80%',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#eee',
   },
-  dropdownItemText: {
-    fontSize: 15,
+  pickerHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#333',
+  },
+  pickerOptions: {
+    paddingBottom: Platform.OS === 'ios' ? 40 : 0,
+  },
+  pickerItem: {
+    color: '#333', // Add explicit color for picker items
+    fontSize: 16,
+    padding: 10, // Add padding to increase height
+    marginVertical: 4, // Add vertical margin
+    height: Platform.OS === 'android' ? 50 : undefined, // Increase height on Android
   },
   dateTimeRow: {
     flexDirection: 'row',
@@ -209,7 +220,7 @@ const PollScreen = () => {
     expiryTime: defaultExpiry.time,
   });
   const [voteStatus, setVoteStatus] = useState("");
-  const [isPollClassModalVisible, setPollClassModalVisible] = useState(false);
+  const [showClassPicker, setShowClassPicker] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [validation, setValidation] = useState({
     question: true,
@@ -478,10 +489,10 @@ const PollScreen = () => {
           <View style={localStyles.inputContainer}>
             <TouchableOpacity
               style={[
-                localStyles.dropdownSelect,
+                localStyles.pickerButton,
                 !validation.pollClass && { borderColor: '#e53935' }
               ]}
-              onPress={() => setPollClassModalVisible(true)}
+              onPress={() => setShowClassPicker(true)}
             >
               <Text style={{ color: newPoll.pollClass ? '#333' : '#999' }}>
                 {newPoll.pollClass || "Select a class"}
@@ -492,33 +503,80 @@ const PollScreen = () => {
             {!validation.pollClass && (
               <Text style={localStyles.validationError}>Class selection is required</Text>
             )}
-            
-            {isPollClassModalVisible && (
-              <View style={localStyles.dropdownMenu}>
-                <ScrollView style={{ maxHeight: 200 }}>
-                  {classesList.map((cls, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={localStyles.dropdownItem}
-                      onPress={() => {
-                        setNewPoll({ ...newPoll, pollClass: cls });
+          </View>
+          
+          {/* Class Picker Modal */}
+          <Modal
+            visible={showClassPicker}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setShowClassPicker(false)}
+          >
+            <View style={localStyles.pickerModal}>
+              <View style={localStyles.pickerContainer}>
+                <View style={localStyles.pickerHeader}>
+                  <Text style={localStyles.pickerHeaderTitle}>Select Class</Text>
+                  <TouchableOpacity onPress={() => setShowClassPicker(false)}>
+                    <Ionicons name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                
+                {classesList.length > 0 ? (
+                  <View style={localStyles.pickerOptions}>
+                    <Picker
+                      selectedValue={newPoll.pollClass}
+                      onValueChange={(itemValue) => {
+                        setNewPoll({ ...newPoll, pollClass: itemValue });
                         setValidation({ ...validation, pollClass: true });
-                        setPollClassModalVisible(false);
+                        if (Platform.OS !== 'ios') {
+                          setShowClassPicker(false);
+                        }
+                      }}
+                      style={{ 
+                        color: '#333',
+                        height: Platform.OS === 'android' ? 48 * classesList.length : undefined,
+                      }}
+                      itemStyle={{ 
+                        color: '#333', 
+                        fontSize: 16, 
+                        height: Platform.OS === 'ios' ? 120 : undefined, // Taller items on iOS
+                        lineHeight: Platform.OS === 'ios' ? 36 : undefined 
                       }}
                     >
-                      <Text style={localStyles.dropdownItemText}>{cls}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <TouchableOpacity
-                  style={[localStyles.dropdownItem, { borderBottomWidth: 0, backgroundColor: '#f5f5f5' }]}
-                  onPress={() => setPollClassModalVisible(false)}
-                >
-                  <Text style={{ textAlign: 'center', fontWeight: '600', color: '#666' }}>Cancel</Text>
-                </TouchableOpacity>
+                      <Picker.Item 
+                        label="- Select a class -" 
+                        value="" 
+                        color="#999"
+                        style={Platform.OS === 'android' ? localStyles.pickerItem : undefined} 
+                      />
+                      {classesList.map((cls, index) => (
+                        <Picker.Item 
+                          key={index} 
+                          label={cls} 
+                          value={cls} 
+                          color="#333" // Explicit color for all items
+                          style={Platform.OS === 'android' ? localStyles.pickerItem : undefined}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                ) : (
+                  <View style={{ padding: 20, alignItems: 'center' }}>
+                    <Text style={{ color: '#666', fontStyle: 'italic' }}>No classes available</Text>
+                  </View>
+                )}
+                
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity
+                    style={[styles.blueButton, { margin: 16 }]}
+                    onPress={() => setShowClassPicker(false)}
+                  >
+                    <Text style={styles.blueButtonText}>Done</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
-          </View>
+            </View>
+          </Modal>
         </View>
         
         {/* Expiry Settings */}
@@ -721,7 +779,7 @@ const PollScreen = () => {
         </TouchableOpacity>
         
         {/* Status Message */}
-        {voteStatus ? (
+        {voteStatus && (
           <View style={{
             padding: 12,
             backgroundColor: voteStatus.includes('successfully') ? '#e3f5e9' : '#ffebee',
@@ -743,7 +801,7 @@ const PollScreen = () => {
               {voteStatus}
             </Text>
           </View>
-        ) : null}
+        )}
       </View>
     </ScrollView>
   );
