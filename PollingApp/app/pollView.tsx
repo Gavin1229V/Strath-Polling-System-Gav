@@ -39,7 +39,7 @@ interface VoterInfo {
 }
 
 // Update the VotersList component to display more user information
-const VotersList = ({ pollId, poll }: { pollId: number, poll: Poll }) => {
+export const VotersList = ({ pollId, poll }: { pollId: number, poll: Poll }) => {
   const [voters, setVoters] = useState<VoterInfo[]>([]);
   const [loadingVoters, setLoadingVoters] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -444,6 +444,23 @@ const PollView = () => {
     }
   }, [initialFilter, normalizedCurrentClasses]);
 
+  // Helper function to check if a poll is expired
+  const isPollExpired = (poll: Poll): boolean => {
+    if (!poll.expiry) return false;
+    
+    try {
+      const now = new Date();
+      // Handle both formats of date strings
+      const expiryDate = new Date(
+        poll.expiry.replace ? poll.expiry.replace(" ", "T") : poll.expiry
+      );
+      return expiryDate <= now;
+    } catch (e) {
+      console.error("Invalid expiry date format:", poll.expiry);
+      return false;
+    }
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -770,8 +787,13 @@ const PollView = () => {
     );
   };
 
-  // Filter polls by class and year group
+  // Filter polls by class, year group, and exclude expired polls
   const filteredPolls = polls.filter((poll) => {
+    // First check if the poll is expired - if it is, exclude it
+    if (isPollExpired(poll)) {
+      return false;
+    }
+    
     // If the poll has a year_group that matches the user's year group, include it
     if (poll.year_group && poll.year_group === userYearGroup) {
       return true;

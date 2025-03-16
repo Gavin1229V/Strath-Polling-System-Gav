@@ -632,6 +632,24 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "600",
   },
+  // Add legend styles for charts
+  legendContainer: {
+    flexDirection: "column",
+    marginTop: 10,
+    width: "100%",
+    paddingHorizontal: 20,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    paddingVertical: 2,
+  },
+  legendText: {
+    fontSize: 13,
+    color: "#333",
+    flex: 1,
+  },
 });
 
 export default styles;

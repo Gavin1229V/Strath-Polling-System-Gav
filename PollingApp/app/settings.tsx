@@ -34,19 +34,16 @@ const Settings = () => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Put Change Classes button at the top and use blue styling */}
+    <View style={[styles.container, { justifyContent: 'center', flex: 0.9 }]}>
       <TouchableOpacity style={styles.button} onPress={() => router.push("/classChooser")}>
         <Text style={styles.buttonText}>Change Classes</Text>
       </TouchableOpacity>
-      {/* Remove Profile Picture Button remains below */}
       <TouchableOpacity 
         style={[styles.button, { backgroundColor: "#FF3B30" }]} 
         onPress={handleRemoveProfilePic}
       >
         <Text style={styles.buttonText}>Remove Profile Picture</Text>
       </TouchableOpacity>
-      {/* Logout Button */}
       <TouchableOpacity 
         style={[styles.button, { backgroundColor: "#FF3B30" }]} 
         onPress={handleLogout}

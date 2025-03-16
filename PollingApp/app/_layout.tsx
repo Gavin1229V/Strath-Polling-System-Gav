@@ -110,6 +110,13 @@ function InnerLayout() {
               headerBackVisible: true,
             }}
           />
+          <Stack.Screen
+            name="expiredPolls"
+            options={{
+              title: "Expired Polls",
+              headerBackVisible: true,
+            }}
+          />
         </Stack>
       </View>
       <NavBar />

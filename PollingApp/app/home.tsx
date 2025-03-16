@@ -453,6 +453,52 @@ const HomeScreen = () => {
               </View>
             )}
           </TouchableOpacity>
+
+          {/* Add Expired Polls Section for Student Reps and Lecturers */}
+          {user && (user.role === 2 || user.role === 3) && (
+            <TouchableOpacity
+              onPress={() => router.push("/expiredPolls")}
+              style={{
+                width: '100%',
+                backgroundColor: "#fff",
+                borderRadius: 12,
+                padding: 20,
+                marginTop: 20,
+                marginBottom: 16,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Ionicons name="time-outline" size={24} color="#9C27B0" />
+                <Text style={{ fontSize: 20, fontWeight: "600", marginLeft: 12 }}>
+                  Expired Polls
+                </Text>
+              </View>
+              <Text style={{ color: "#666", marginTop: 8, lineHeight: 20 }}>
+                View results from polls that have ended. Access historical voting data and statistics.
+              </Text>
+              <View style={{ 
+                backgroundColor: "#F3E5F5", 
+                padding: 10, 
+                borderRadius: 8, 
+                marginTop: 12,
+                flexDirection: "row",
+                alignItems: "center"
+              }}>
+                <Ionicons name="information-circle" size={20} color="#9C27B0" style={{ marginRight: 8 }} />
+                <Text style={{ color: "#6A1B9A", flex: 1 }}>
+                  {user.role === 2 
+                    ? "As a student representative, you can see expired polls for your year group." 
+                    : "As a lecturer, you can access all expired polls."}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          
         </View>
       </ScrollView>
     </SafeAreaView>
