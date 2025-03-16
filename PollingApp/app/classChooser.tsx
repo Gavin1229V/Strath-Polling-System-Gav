@@ -4,6 +4,7 @@ import { useAuth } from "./userDetails";
 import { useRouter } from "expo-router";
 import { SERVER_IP } from "./config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import globalStyles from "../styles/styles"; // Import global styles
 
 // Hardcoded mapping for each year
 const yearClassMapping: Record<string, string[]> = {
@@ -151,7 +152,7 @@ const ClassChooser = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[globalStyles.container, styles.container]}>
       {/* Year selector at top left */}
       <TouchableOpacity style={styles.yearSelector} onPress={() => setShowYearPicker(true)}>
         <Text style={styles.yearSelectorText}>{selectedYear}</Text>
@@ -190,28 +191,28 @@ const ClassChooser = () => {
           </TouchableOpacity>
           {dropdowns.length > 1 && (
             <TouchableOpacity 
-              style={styles.removeButton}
+              style={[globalStyles.blueButtonSmall, { backgroundColor: "red" }]}
               onPress={() => removeOption(index)}
             >
-              <Text style={styles.removeButtonText}>Remove</Text>
+              <Text style={globalStyles.blueButtonTextSmall}>Remove</Text>
             </TouchableOpacity>
           )}
         </View>
       ))}
       {/* Select All button: shown until every class is selected */}
       {dropdowns.filter(val => val !== "").length < currentClasses.length && (
-        <TouchableOpacity style={styles.button} onPress={selectAll}>
-          <Text style={styles.buttonText}>Select All</Text>
+        <TouchableOpacity style={[globalStyles.blueButton, styles.buttonSpacing]} onPress={selectAll}>
+          <Text style={globalStyles.blueButtonText}>Select All</Text>
         </TouchableOpacity>
       )}
       {dropdowns.length > 1 && (
-        <TouchableOpacity style={styles.button} onPress={removeAll}>
-          <Text style={styles.buttonText}>Remove All</Text>
+        <TouchableOpacity style={[globalStyles.blueButton, styles.buttonSpacing]} onPress={removeAll}>
+          <Text style={globalStyles.blueButtonText}>Remove All</Text>
         </TouchableOpacity>
       )}
       {/* New Save Classes button */}
-      <TouchableOpacity style={styles.button} onPress={saveClasses}>
-        <Text style={styles.buttonText}>Save Classes</Text>
+      <TouchableOpacity style={[globalStyles.blueButton, styles.buttonSpacing]} onPress={saveClasses}>
+        <Text style={globalStyles.blueButtonText}>Save Classes</Text>
       </TouchableOpacity>
       {pickerIndex !== null && (
         <View style={styles.pickerModal}>
@@ -242,7 +243,6 @@ export default ClassChooser;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 20,
   },
   yearSelector: {
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   dropdownContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 5,
+    marginVertical: 12, // Increased from 5 to 12 for more spacing between inputs
   },
   dropdown: {
     flex: 1,
@@ -293,28 +293,6 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     fontSize: 16,
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 5,
-    alignItems: "center",
-    marginVertical: 10,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  removeButton: {
-    backgroundColor: "red",
-    padding: 10,
-    borderRadius: 5,
-    marginLeft: 10,
-  },
-  removeButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
   },
   pickerModal: {
     position: "absolute",
@@ -346,6 +324,9 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontWeight: "bold",
+  },
+  buttonSpacing: {
+    marginVertical: 16, // Increased from the default 10 to 16 for more spacing between buttons
   },
 });
 

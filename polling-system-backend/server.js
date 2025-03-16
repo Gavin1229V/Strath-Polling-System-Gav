@@ -21,6 +21,7 @@ const verificationRouter = require("./verify");
 const { getAccountDetails } = require("./accountDetailGetter");
 const { updateUserClasses } = require("./classHelper");
 
+
 // Create a cache with 5 minute TTL
 const pollCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
@@ -170,12 +171,12 @@ app.post("/api/login", async (req, res) => {
 
 // Save classes endpoint
 app.post("/api/saveclasses", async (req, res) => {
-  const { user_id, classes } = req.body;
+  const { user_id, classes, year } = req.body;
   if (!user_id || !classes || !Array.isArray(classes)) {
     return res.status(400).json({ message: "user_id and an array of classes are required." });
   }
   try {
-    await updateUserClasses(user_id, classes);
+    await updateUserClasses(user_id, classes, year);
     res.status(200).json({ message: "Classes saved successfully." });
   } catch (error) {
     console.error("[ERROR] Saving classes:", error);
@@ -441,6 +442,35 @@ const getLocalIpAddress = () => {
   }
   return localIp;
 };
+
+// Add this function somewhere before server startup
+async function runMigrations() {
+  console.log("Checking and running any pending migrations...");
+  const migrationsDir = path.join(__dirname, 'migrations');
+  
+  // Check if migrations directory exists
+  if (fs.existsSync(migrationsDir)) {
+    try {
+      // Run the migration script
+      require('./migrations/add_year_group_global_to_polls');
+      console.log("Migration check completed");
+    } catch (error) {
+      console.error("Error running migrations:", error);
+    }
+  }
+}
+
+// Add this before starting the server
+// For example, before the line that has app.listen or server.listen
+runMigrations()
+  .then(() => {
+    console.log("Database migrations complete, starting server...");
+    // Your existing server startup code continues here
+  })
+  .catch(err => {
+    console.error("Migration error:", err);
+    // You might want to still start the server despite migration errors
+  });
 
 // Start the server
 server.listen(PORT, () => {

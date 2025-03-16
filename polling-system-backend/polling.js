@@ -1,7 +1,7 @@
 const { connectionPromise, getConnection } = require("./db");
 
 // Create a new poll
-const createPoll = async (question, options, created_by, created_by_id, pollClass, expiry) => {
+const createPoll = async (question, options, created_by, created_by_id, pollClass, expiry, year_group = null) => {
     await connectionPromise;
     const connection = await getConnection();
 
@@ -12,8 +12,8 @@ const createPoll = async (question, options, created_by, created_by_id, pollClas
     const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     try {
-        const query = `INSERT INTO polls (question, created_by, created_by_id, created_at, class, expiry) VALUES (?, ?, ?, ?, ?, ?)`;
-        const [result] = await connection.query(query, [question, created_by, created_by_id, createdAt, pollClass, expiry]);
+        const query = `INSERT INTO polls (question, created_by, created_by_id, created_at, class, expiry, year_group) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const [result] = await connection.query(query, [question, created_by, created_by_id, createdAt, pollClass, expiry, year_group]);
         const pollId = result.insertId;
 
         // Insert options into the database
@@ -26,6 +26,7 @@ const createPoll = async (question, options, created_by, created_by_id, pollClas
 
         return pollId;
     } catch (error) {
+        console.error("Error in createPoll:", error);
         throw new Error("Failed to create poll.");
     }
 };
@@ -38,6 +39,7 @@ const getPolls = async () => {
 
         const query = `
             SELECT p.id, p.question, p.created_by, p.created_by_id, p.created_at, p.class, p.expiry,
+                   p.year_group,
                    po.id AS option_id, po.option_index, po.option_text, po.vote_count, po.voters, po.anonymous,
                    u.profile_picture
             FROM polls p 
@@ -95,6 +97,7 @@ const getPolls = async () => {
                     created_by_id: row.created_by_id,
                     pollClass: row.class || "",
                     expiry: row.expiry,
+                    year_group: row.year_group,
                     profile_picture: row.profile_picture 
                       ? (Buffer.isBuffer(row.profile_picture)
                           ? "data:image/png;base64," + row.profile_picture.toString("base64")

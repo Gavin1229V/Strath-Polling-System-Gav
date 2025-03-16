@@ -244,8 +244,28 @@ const HomeScreen = () => {
       );
     }
     
-    // Process the profile picture URL
-    const processedUrl = processProfilePicture(profilePicture);
+    // Process the profile picture URL - ensure we have a clean string
+    let processedUrl;
+    try {
+      // Handle case where profilePicture might be any format
+      const picValue = typeof profilePicture === 'string' 
+        ? profilePicture 
+        : JSON.stringify(profilePicture);
+        
+      processedUrl = processProfilePicture(picValue);
+    } catch (error) {
+      console.error("Error processing profile picture:", error);
+      return (
+        <Text style={{
+          fontSize: Math.max(10, Math.min(12, width * 0.03)),
+          color: "red",
+          textAlign: "center",
+          padding: 5
+        }}>
+          Error loading image
+        </Text>
+      );
+    }
     
     return (
       <Image 
@@ -257,7 +277,10 @@ const HomeScreen = () => {
           borderRadius: profileSize / 2
         }}
         accessibilityLabel="Profile picture"
-        onError={() => setProfilePicture(null)}
+        onError={() => {
+          console.warn("Image loading error, resetting profile picture");
+          setProfilePicture(null);
+        }}
       />
     );
   };

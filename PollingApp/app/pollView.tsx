@@ -213,6 +213,7 @@ const PollView = () => {
   const [userVotes, setUserVotes] = useState<{[key: number]: boolean}>({});
   const [anonymousMode, setAnonymousMode] = useState<boolean>(false);
   const [anonymousVotes, setAnonymousVotes] = useState<{[key: number]: boolean}>({});
+  const [userYearGroup, setUserYearGroup] = useState<number | null>(null);
 
   // Get window dimensions for responsive layouts
   const { width: windowWidth } = useWindowDimensions();
@@ -266,6 +267,11 @@ const PollView = () => {
               .map((cls: string) => cls.trim())
               .filter(Boolean);
             setCurrentClasses(classesArr);
+            
+            // Store the user's year group
+            if (account.year_group) {
+              setUserYearGroup(account.year_group);
+            }
           }
         })
         .catch((err) => {
@@ -552,6 +558,7 @@ const PollView = () => {
   // Render the pie chart and poll details
   const renderPieChart = (poll: Poll) => {
     const pollClass = poll.pollClass || (poll as any)["class"] || "";
+    const isYearGroupPoll = poll.global && poll.year_group;
 
     // Use the shared profile picture processing function
     let profilePicUrl = processProfilePicture(poll.profile_picture);
@@ -573,15 +580,15 @@ const PollView = () => {
     // Platform-specific label styles to avoid web warnings
     const labelStyles = Platform.select({
       web: {
-        fill: "#fff",
+        fill: "#000", // Changed from "#fff" to black
         fontSize: 14,
         fontWeight: "bold",
       },
       default: {
-        fill: "#fff",
+        fill: "#000", // Changed from "#fff" to black
         fontSize: 14,
         fontWeight: "bold",
-        textShadow: "1px 1px 2px rgba(0,0,0,0.5)"
+        textShadow: "1px 1px 2px rgba(255,255,255,0.7)" // Modified shadow for better contrast
       }
     });
 
@@ -606,8 +613,28 @@ const PollView = () => {
           <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>i</Text>
         </TouchableOpacity>
 
-        {/* Class code (e.g. CS426) */}
-        {pollClass ? (
+        {/* Year Group indicator or Class code */}
+        {isYearGroupPoll ? (
+          <View style={{
+            backgroundColor: '#e3f2fd',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 16,
+            alignSelf: 'flex-start',
+            marginBottom: 6,
+            borderWidth: 1,
+            borderColor: '#bbdefb',
+            flexDirection: 'row',
+            alignItems: 'center'
+          }}>
+            <Ionicons name="people" size={14} color="#1976d2" style={{ marginRight: 4 }} />
+            <Text style={{ 
+              color: '#1976d2',
+              fontWeight: '600',
+              fontSize: 13,
+            }}>Year {poll.year_group}</Text>
+          </View>
+        ) : pollClass ? (
           <Text style={styles.classCode}>{pollClass}</Text>
         ) : null}
 
@@ -665,9 +692,36 @@ const PollView = () => {
     // Determine if voting is disabled
     const votingDisabled = voteLoading || userVotedInPoll;
     
+    // Calculate total votes
+    const totalVotes = item.options.reduce((sum, option) => sum + option.votes, 0);
+    
     return (
       <View style={[styles.pollCard, isMobile && { marginHorizontal: 5, padding: 10 }]}>
         {renderPieChart(item)}
+        
+        {/* Total votes indicator */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingVertical: 8,
+          marginTop: 5,
+          marginBottom: 10,
+          backgroundColor: '#f5f5f5',
+          borderRadius: 20,
+          paddingHorizontal: 15,
+          alignSelf: 'center'
+        }}>
+          <Ionicons name="stats-chart" size={16} color="#555" style={{ marginRight: 6 }} />
+          <Text style={{ 
+            fontSize: 14, 
+            fontWeight: '600', 
+            color: '#555' 
+          }}>
+            {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'} total
+          </Text>
+        </View>
+        
         <View style={[
           styles.voteOptionsContainer,
           isMobile && { flexDirection: "column", alignItems: "stretch", paddingHorizontal: 10 }
@@ -716,8 +770,14 @@ const PollView = () => {
     );
   };
 
-  // Filter polls by class
+  // Filter polls by class and year group
   const filteredPolls = polls.filter((poll) => {
+    // If the poll has a year_group that matches the user's year group, include it
+    if (poll.year_group && poll.year_group === userYearGroup) {
+      return true;
+    }
+    
+    // Otherwise filter by class as usual
     const pollClassNormalized = (poll.pollClass || "").trim().toLowerCase();
     return activeFilter === "All"
       ? normalizedCurrentClasses.includes(pollClassNormalized)
@@ -843,7 +903,7 @@ const PollView = () => {
                   <Text style={[
                     styles.yearFilterChipText,
                     activeFilter === "All" && styles.yearFilterChipTextActive
-                  ]}>All Classes</Text>
+                  ]}>All Polls</Text>
                 </TouchableOpacity>
                 
                 {currentClasses.map((cls) => (
@@ -867,7 +927,7 @@ const PollView = () => {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text>You have no active polls for this class</Text>
+            <Text>You have no active polls</Text>
           </View>
         }
       />
@@ -909,6 +969,22 @@ const PollView = () => {
               />
             ) : null}
             <Text style={styles.infoTitle}>Poll Info</Text>
+            
+            {/* Add Year Group indicator for global polls */}
+            {infoPoll.global && infoPoll.year_group ? (
+              <View style={{
+                backgroundColor: '#e3f2fd', 
+                padding: 8, 
+                borderRadius: 8, 
+                marginVertical: 8,
+                alignSelf: 'center'
+              }}>
+                <Text style={{ color: '#1976d2', fontWeight: '600' }}>
+                  Year {infoPoll.year_group} Group Poll
+                </Text>
+              </View>
+            ) : null}
+            
             <Text style={styles.infoDetail}>
               Created on:{" "}
               {new Date(infoPoll.created_at.replace(" ", "T")).toLocaleString()}

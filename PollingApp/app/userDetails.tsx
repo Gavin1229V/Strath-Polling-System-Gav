@@ -30,35 +30,48 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUserState] = useState<AuthUser | null>(null);
 
-  // Update setUser to store profile_picture as a JSON string
+  // Store the complete user object in AsyncStorage without splitting
   const setUser = async (userData: AuthUser | null) => {
     setUserState(userData);
     if (userData) {
-      const { profile_picture, ...userToStore } = userData;
-      await AsyncStorage.setItem("user", JSON.stringify(userToStore));
-      if (profile_picture) {
-        // Store profile_picture as a string via JSON.stringify
-        await AsyncStorage.setItem("profile_picture", JSON.stringify(profile_picture));
-      } else {
-        await AsyncStorage.removeItem("profile_picture");
+      try {
+        // Store the entire user object in one AsyncStorage item
+        await AsyncStorage.setItem("userData", JSON.stringify(userData));
+        console.log("User data saved to AsyncStorage");
+      } catch (error) {
+        console.error("Failed to save user data:", error);
       }
     } else {
-      await AsyncStorage.removeItem("user");
-      await AsyncStorage.removeItem("profile_picture");
+      // If userData is null, this is a logout operation
+      await logout();
     }
   };
 
-  // On provider mount, load the stored user and the separate profile picture
+  // New function to handle logout and clear user data
+  const logout = async () => {
+    try {
+      await AsyncStorage.removeItem("userData");
+      // Clear any other user-related data from AsyncStorage
+      console.log("User data removed from AsyncStorage");
+    } catch (error) {
+      console.error("Failed to clear user data:", error);
+    }
+  };
+
+  // On provider mount, load the complete stored user data
   useEffect(() => {
     const loadUser = async () => {
-      const storedUser = await AsyncStorage.getItem("user");
-      const storedPic = await AsyncStorage.getItem("profile_picture");
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        if (storedPic) {
-          parsedUser.profile_picture = storedPic;
+      try {
+        const storedUserData = await AsyncStorage.getItem("userData");
+        if (storedUserData) {
+          const parsedUser = JSON.parse(storedUserData);
+          setUserState(parsedUser);
+          console.log("User data loaded from AsyncStorage");
         }
-        setUserState(parsedUser);
+      } catch (error) {
+        console.error("Failed to load user data:", error);
+        // In case of error, ensure we clear potentially corrupted data
+        await AsyncStorage.removeItem("userData");
       }
     };
     loadUser();
@@ -114,6 +127,16 @@ export const getLastNameFromEmail = (email: string): string => {
 export const useUserClasses = () => {
   const { user } = useAuth();
   return user?.classes ? user.classes.split(",") : [];
+};
+
+// Make the logout function available in the context
+export const useLogout = () => {
+  const { setUser } = useAuth();
+  
+  return async () => {
+    // Clear user from context
+    setUser(null);
+  };
 };
 
 export default {}; // Added default export to suppress warning

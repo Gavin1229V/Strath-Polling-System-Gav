@@ -46,7 +46,7 @@ const NavBar = () => {
           </Text>
         </TouchableOpacity>
         
-        {isInstructor && (
+        {(isInstructor || isStudentRep) && (
           <TouchableOpacity 
             style={[styles.navButton, isActive("/pollCreator") && styles.activeNavButton]} 
             onPress={() => router.replace("/pollCreator")}

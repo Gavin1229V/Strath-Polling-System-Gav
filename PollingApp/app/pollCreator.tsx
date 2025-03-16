@@ -16,7 +16,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from '@react-native-picker/picker';
 import { fetchPolls, getSocket } from "./global";
 import { SERVER_IP } from "./config";
-import { useFirstName, useLastName, useAuth, useUserClasses } from "./userDetails";
+import { useFirstName, useLastName, useAuth, useUserClasses, useUserRole } from "./userDetails";
 import { Poll } from "./global";
 import styles from "../styles/styles"; // Use global styles
 import { Ionicons } from '@expo/vector-icons';
@@ -204,6 +204,20 @@ const localStyles = StyleSheet.create({
     color: '#e53935',
     fontSize: 12,
     marginTop: 4,
+  },
+  yearGroupBadge: {
+    backgroundColor: '#e3f2fd',
+    borderWidth: 1,
+    borderColor: '#bbdefb',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  yearGroupText: {
+    color: '#1976d2',
+    fontSize: 15,
+    fontWeight: '500',
   }
 });
 
@@ -235,6 +249,10 @@ const PollScreen = () => {
   const { user } = useAuth();
   const [dbClasses, setDbClasses] = useState<string>("");
   const userClassesFromContext = useUserClasses();
+  const userRole = useUserRole();
+  const isStudentRep = userRole === 2;
+  const isInstructor = userRole === 3;
+  const [yearGroup, setYearGroup] = useState<number | null>(null);
 
   // Classes list
   const classesList = dbClasses
@@ -266,11 +284,14 @@ const PollScreen = () => {
           if (details && details.length > 0) {
             const account = details[0];
             setDbClasses(account.classes || "");
+            if (isStudentRep && account.year_group) {
+              setYearGroup(account.year_group);
+            }
           }
         })
         .catch((err) => console.error("Error fetching account details:", err));
     }
-  }, [user]);
+  }, [user, isStudentRep]);
 
   // Validate poll inputs
   const validatePoll = () => {
@@ -281,8 +302,8 @@ const PollScreen = () => {
     const optionsValidation = newPoll.options.map(opt => opt.trim().length > 0);
     const validOptions = newPoll.options.filter(opt => opt.trim().length > 0);
     
-    // Validate class
-    const isClassValid = newPoll.pollClass.trim().length > 0;
+    // Validate class (only for instructors)
+    const isClassValid = isStudentRep ? true : newPoll.pollClass.trim().length > 0;
 
     // Update validation state
     setValidation({
@@ -317,9 +338,9 @@ const PollScreen = () => {
           options: filteredOptions,
           created_by: author,
           created_by_id: user?.user_id,
-          class: newPoll.pollClass,
-          expiry: `${newPoll.expiryDate} ${newPoll.expiryTime}:00`,
-          global: false,
+          class: isStudentRep ? null : newPoll.pollClass,
+          year_group: isStudentRep ? yearGroup : null,
+          expiry: `${newPoll.expiryDate} ${newPoll.expiryTime}:00`
         }),
       });
       
@@ -396,6 +417,18 @@ const PollScreen = () => {
         <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 16, marginTop: 8, color: '#333' }}>
           Create a New Poll
         </Text>
+        
+        {/* For Student Reps: Year Group Information */}
+        {isStudentRep && (
+          <View style={localStyles.yearGroupBadge}>
+            <Text style={localStyles.yearGroupText}>
+              <Ionicons name="information-circle-outline" size={18} /> Year {yearGroup || '?'} Group Poll
+            </Text>
+            <Text style={{ color: '#444', marginTop: 5, fontSize: 14 }}>
+              As a student representative, your poll will be visible to all students in your year group.
+            </Text>
+          </View>
+        )}
         
         {/* Poll Question Section */}
         <View style={localStyles.formCard}>
@@ -483,101 +516,103 @@ const PollScreen = () => {
           )}
         </View>
         
-        {/* Class Selection */}
-        <View style={localStyles.formCard}>
-          <Text style={localStyles.sectionTitle}>Class <Text style={localStyles.requiredIndicator}>*</Text></Text>
-          <View style={localStyles.inputContainer}>
-            <TouchableOpacity
-              style={[
-                localStyles.pickerButton,
-                !validation.pollClass && { borderColor: '#e53935' }
-              ]}
-              onPress={() => setShowClassPicker(true)}
-            >
-              <Text style={{ color: newPoll.pollClass ? '#333' : '#999' }}>
-                {newPoll.pollClass || "Select a class"}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#666" />
-            </TouchableOpacity>
-            
-            {!validation.pollClass && (
-              <Text style={localStyles.validationError}>Class selection is required</Text>
-            )}
-          </View>
-          
-          {/* Class Picker Modal */}
-          <Modal
-            visible={showClassPicker}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={() => setShowClassPicker(false)}
-          >
-            <View style={localStyles.pickerModal}>
-              <View style={localStyles.pickerContainer}>
-                <View style={localStyles.pickerHeader}>
-                  <Text style={localStyles.pickerHeaderTitle}>Select Class</Text>
-                  <TouchableOpacity onPress={() => setShowClassPicker(false)}>
-                    <Ionicons name="close" size={24} color="#666" />
-                  </TouchableOpacity>
-                </View>
-                
-                {classesList.length > 0 ? (
-                  <View style={localStyles.pickerOptions}>
-                    <Picker
-                      selectedValue={newPoll.pollClass}
-                      onValueChange={(itemValue) => {
-                        setNewPoll({ ...newPoll, pollClass: itemValue });
-                        setValidation({ ...validation, pollClass: true });
-                        if (Platform.OS !== 'ios') {
-                          setShowClassPicker(false);
-                        }
-                      }}
-                      style={{ 
-                        color: '#333',
-                        height: Platform.OS === 'android' ? 48 * classesList.length : undefined,
-                      }}
-                      itemStyle={{ 
-                        color: '#333', 
-                        fontSize: 16, 
-                        height: Platform.OS === 'ios' ? 120 : undefined, // Taller items on iOS
-                        lineHeight: Platform.OS === 'ios' ? 36 : undefined 
-                      }}
-                    >
-                      <Picker.Item 
-                        label="- Select a class -" 
-                        value="" 
-                        color="#999"
-                        style={Platform.OS === 'android' ? localStyles.pickerItem : undefined} 
-                      />
-                      {classesList.map((cls, index) => (
-                        <Picker.Item 
-                          key={index} 
-                          label={cls} 
-                          value={cls} 
-                          color="#333" // Explicit color for all items
-                          style={Platform.OS === 'android' ? localStyles.pickerItem : undefined}
-                        />
-                      ))}
-                    </Picker>
-                  </View>
-                ) : (
-                  <View style={{ padding: 20, alignItems: 'center' }}>
-                    <Text style={{ color: '#666', fontStyle: 'italic' }}>No classes available</Text>
-                  </View>
-                )}
-                
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity
-                    style={[styles.blueButton, { margin: 16 }]}
-                    onPress={() => setShowClassPicker(false)}
-                  >
-                    <Text style={styles.blueButtonText}>Done</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+        {/* Class Selection - Only visible for Instructors */}
+        {isInstructor && (
+          <View style={localStyles.formCard}>
+            <Text style={localStyles.sectionTitle}>Class <Text style={localStyles.requiredIndicator}>*</Text></Text>
+            <View style={localStyles.inputContainer}>
+              <TouchableOpacity
+                style={[
+                  localStyles.pickerButton,
+                  !validation.pollClass && { borderColor: '#e53935' }
+                ]}
+                onPress={() => setShowClassPicker(true)}
+              >
+                <Text style={{ color: newPoll.pollClass ? '#333' : '#999' }}>
+                  {newPoll.pollClass || "Select a class"}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+              
+              {!validation.pollClass && (
+                <Text style={localStyles.validationError}>Class selection is required</Text>
+              )}
             </View>
-          </Modal>
-        </View>
+            
+            {/* Class Picker Modal */}
+            <Modal
+              visible={showClassPicker}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => setShowClassPicker(false)}
+            >
+              <View style={localStyles.pickerModal}>
+                <View style={localStyles.pickerContainer}>
+                  <View style={localStyles.pickerHeader}>
+                    <Text style={localStyles.pickerHeaderTitle}>Select Class</Text>
+                    <TouchableOpacity onPress={() => setShowClassPicker(false)}>
+                      <Ionicons name="close" size={24} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {classesList.length > 0 ? (
+                    <View style={localStyles.pickerOptions}>
+                      <Picker
+                        selectedValue={newPoll.pollClass}
+                        onValueChange={(itemValue) => {
+                          setNewPoll({ ...newPoll, pollClass: itemValue });
+                          setValidation({ ...validation, pollClass: true });
+                          if (Platform.OS !== 'ios') {
+                            setShowClassPicker(false);
+                          }
+                        }}
+                        style={{ 
+                          color: '#333',
+                          height: Platform.OS === 'android' ? 48 * classesList.length : undefined,
+                        }}
+                        itemStyle={{ 
+                          color: '#333', 
+                          fontSize: 16, 
+                          height: Platform.OS === 'ios' ? 120 : undefined, // Taller items on iOS
+                          lineHeight: Platform.OS === 'ios' ? 36 : undefined 
+                        }}
+                      >
+                        <Picker.Item 
+                          label="- Select a class -" 
+                          value="" 
+                          color="#999"
+                          style={Platform.OS === 'android' ? localStyles.pickerItem : undefined} 
+                        />
+                        {classesList.map((cls, index) => (
+                          <Picker.Item 
+                            key={index} 
+                            label={cls} 
+                            value={cls} 
+                            color="#333" // Explicit color for all items
+                            style={Platform.OS === 'android' ? localStyles.pickerItem : undefined}
+                          />
+                        ))}
+                      </Picker>
+                    </View>
+                  ) : (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <Text style={{ color: '#666', fontStyle: 'italic' }}>No classes available</Text>
+                    </View>
+                  )}
+                  
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity
+                      style={[styles.blueButton, { margin: 16 }]}
+                      onPress={() => setShowClassPicker(false)}
+                    >
+                      <Text style={styles.blueButtonText}>Done</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </Modal>
+          </View>
+        )}
         
         {/* Expiry Settings */}
         <View style={localStyles.formCard}>

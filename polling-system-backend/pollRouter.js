@@ -4,9 +4,9 @@ const { createPoll, getPolls, vote } = require("./polling"); // Import functions
 
 // API Routes
 router.post("/", async (req, res) => {
-    const { question, options, created_by, created_by_id, class: pollClass, expiry } = req.body;
+    const { question, options, created_by, created_by_id, class: pollClass, expiry, year_group } = req.body;
     try {
-        const pollId = await createPoll(question, options, created_by, created_by_id, pollClass, expiry);
+        const pollId = await createPoll(question, options, created_by, created_by_id, pollClass, expiry, year_group);
         res.status(201).json({ pollId });
     } catch (error) {
         res.status(500).json({ error: error.message });

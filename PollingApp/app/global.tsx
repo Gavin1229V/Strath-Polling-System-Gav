@@ -29,6 +29,8 @@ export type Poll = {
         username?: string;
         profile_picture?: string;
     }[];
+    year_group?: number;
+    global?: boolean;
 };
 
 // Add a simple cache for polls with expiration
@@ -236,10 +238,15 @@ export const processProfilePicture = (profilePic: string | null | undefined): st
   if (!profilePic) return null;
   
   try {
-    // Handle string cleanup
-    let pic = profilePic.trim();
+    // If it's not a string, try to convert it
+    let pic = typeof profilePic === 'string' 
+      ? profilePic 
+      : JSON.stringify(profilePic);
     
-    // Remove quotes if present
+    // Handle string cleanup
+    pic = pic.trim();
+    
+    // Remove quotes if present (handles JSON stringified strings)
     if (pic.startsWith(`"`) && pic.endsWith(`"`)) {
       pic = pic.slice(1, -1);
     }
