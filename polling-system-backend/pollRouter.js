@@ -47,7 +47,7 @@ const getPolls = async () => {
         const query = `
             SELECT p.id, p.question, p.created_by, p.created_by_id, p.created_at, 
                    p.class AS pollClass, p.expiry,
-                   po.id AS option_id, po.option_index, po.option_text, po.vote_count, po.voters,
+                   po.id AS option_id, po.option_index, po.option_text, po.vote_count, po.voters, po.anonymous,
                    u.profile_picture
             FROM polls p 
             LEFT JOIN poll_options po ON p.id = po.poll_id
@@ -77,9 +77,15 @@ const getPolls = async () => {
             );
             
             voters.forEach(voter => {
+                // Parse name from email (format: firstname.lastname.number@...)
+                const nameParts = parseNameFromEmail(voter.email || "");
+                
                 voterMap[voter.user_id] = {
                     id: voter.user_id,
                     username: voter.username,
+                    first_name: nameParts.firstName,
+                    last_name: nameParts.lastName,
+                    email: voter.email,
                     profile_picture: voter.profile_picture
                         ? Buffer.isBuffer(voter.profile_picture)
                             ? "data:image/png;base64," + voter.profile_picture.toString("base64")
@@ -114,20 +120,42 @@ const getPolls = async () => {
                 index: row.option_index,
                 text: row.option_text,
                 votes: row.vote_count || 0,
-                voters: row.voters || ""
+                voters: row.voters || "",
+                anonymous: row.anonymous || "" // Add anonymous flags
             });
 
-            // Add voters to the poll object - improved handling for anonymous voters
+            // Add voters to the poll object with improved information
             if (row.voters) {
                 const voterIds = row.voters.split(',');
-                voterIds.forEach(voterId => {
+                const anonymousFlags = row.anonymous ? row.anonymous.split(',') : [];
+                
+                // Make sure arrays match in length
+                while (anonymousFlags.length < voterIds.length) {
+                    anonymousFlags.push('0');
+                }
+                
+                voterIds.forEach((voterId, index) => {
                     const trimmedId = voterId.trim();
-                    if (trimmedId === "1") {
-                        // For anonymous users, add a new entry each time to count them individually
-                        acc[row.id].voters.push({ id: "1", username: "Anonymous" });
-                    } else if (voterMap[trimmedId] && !acc[row.id].voters.some(v => v.id === trimmedId)) {
-                        // For logged-in users, avoid duplicates within the poll
-                        acc[row.id].voters.push(voterMap[trimmedId]);
+                    const isAnonymous = anonymousFlags[index] === '1';
+                    
+                    // Only add each non-anonymous voter once
+                    if (!isAnonymous && !acc[row.id].voters.some(v => v.id === trimmedId)) {
+                        acc[row.id].voters.push({
+                            id: trimmedId,
+                            first_name: voterMap[trimmedId]?.first_name,
+                            last_name: voterMap[trimmedId]?.last_name,
+                            email: voterMap[trimmedId]?.email,
+                            username: voterMap[trimmedId]?.username || `User ${trimmedId}`,
+                            profile_picture: voterMap[trimmedId]?.profile_picture,
+                            isAnonymous: false
+                        });
+                    } else if (isAnonymous) {
+                        // Always add anonymous users separately
+                        acc[row.id].voters.push({ 
+                            id: trimmedId, 
+                            username: "Anonymous",
+                            isAnonymous: true 
+                        });
                     }
                 });
             }
@@ -142,8 +170,45 @@ const getPolls = async () => {
     }
 };
 
+// Helper function to parse first and last name from email address
+function parseNameFromEmail(email) {
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+        return { firstName: "", lastName: "" };
+    }
+    
+    try {
+        // Extract the part before the @ symbol
+        const localPart = email.split('@')[0];
+        
+        // Split by dots and remove any numeric suffix
+        const parts = localPart.split('.');
+        
+        // Handle different email formats
+        if (parts.length >= 2) {
+            // Format: firstname.lastname.number@... or firstname.lastname@...
+            let firstName = parts[0];
+            let lastName = parts[1];
+            
+            // Check if lastName contains numbers at the end and remove them
+            lastName = lastName.replace(/\d+$/, '');
+            
+            // Capitalize first letter
+            firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+            lastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
+            
+            return { firstName, lastName };
+        } else {
+            // Format: username@... with no dots
+            return { firstName: localPart, lastName: "" };
+        }
+    } catch (e) {
+        console.error("Error parsing email:", e);
+        return { firstName: "", lastName: "" };
+    }
+}
+
 // Vote for an option
-const vote = async (optionId, userId) => {
+const vote = async (optionId, userId, isAnonymous = 0) => {
     const connection = await getConnection();
 
     if (!optionId || !userId) {
@@ -151,11 +216,11 @@ const vote = async (optionId, userId) => {
     }
 
     try {
-        console.log(`[DEBUG] Attempting vote update for option: ${optionId} by user: ${userId}`);
+        console.log(`[DEBUG] Attempting vote update for option: ${optionId} by user: ${userId}, anonymous: ${isAnonymous}`);
         
         // First, get current voters list for this option
         const [optionRows] = await connection.query(
-            `SELECT vote_count, voters FROM poll_options WHERE id = ?`,
+            `SELECT vote_count, voters, anonymous FROM poll_options WHERE id = ?`,
             [optionId]
         );
 
@@ -163,7 +228,9 @@ const vote = async (optionId, userId) => {
             throw new Error("No option found with the given ID.");
         }
 
+        // First check if user already voted for this option
         const currentVoters = optionRows[0].voters ? optionRows[0].voters.split(',') : [];
+        const currentAnonymous = optionRows[0].anonymous ? optionRows[0].anonymous.split(',') : [];
         
         // Check if user already voted for this option
         if (currentVoters.includes(userId.toString())) {
@@ -173,15 +240,19 @@ const vote = async (optionId, userId) => {
 
         // Add user to voters list and update vote count
         currentVoters.push(userId.toString());
+        currentAnonymous.push(isAnonymous.toString());
+        
         const newVoters = currentVoters.join(',');
+        const newAnonymous = currentAnonymous.join(',');
         
         const query = `UPDATE poll_options 
                       SET vote_count = COALESCE(vote_count, 0) + 1, 
-                          voters = ? 
+                          voters = ?,
+                          anonymous = ?
                       WHERE id = ?`;
-        const [result] = await connection.query(query, [newVoters, optionId]);
+        const [result] = await connection.query(query, [newVoters, newAnonymous, optionId]);
 
-        console.log(`[INFO] Vote update succeeded for option: ${optionId} by user: ${userId}`);
+        console.log(`[INFO] Vote update succeeded for option: ${optionId} by user: ${userId}, anonymous: ${isAnonymous}`);
         return { success: true };
     } catch (error) {
         console.error(`[ERROR] Vote update failed for option: ${optionId}`, error);
@@ -210,9 +281,15 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/vote", async (req, res) => {
-    const { optionId, userId } = req.body;
+    const { optionId, userId, isAnonymous } = req.body;
+    
+    // Ensure isAnonymous is properly converted to a number (0 or 1)
+    const normalizedIsAnonymous = isAnonymous === true || isAnonymous === 1 || isAnonymous === "1" ? 1 : 0;
+    
+    console.log(`[DEBUG] Vote request received: optionId=${optionId}, userId=${userId}, isAnonymous=${isAnonymous}, normalized=${normalizedIsAnonymous}`);
+    
     try {
-        const result = await vote(optionId, userId);
+        const result = await vote(optionId, userId, normalizedIsAnonymous);
         res.status(200).json({ 
             message: "Vote registered",
             ...result

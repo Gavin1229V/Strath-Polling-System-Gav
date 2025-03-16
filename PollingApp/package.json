@@ -52,7 +52,8 @@
     "react-native-webview": "13.12.5",
     "socket.io-client": "^4.8.1",
     "victory-native": "^37.3.6",
-    "victory-pie": "^37.3.6"
+    "victory-pie": "^37.3.6",
+    "expo-file-system": "~18.0.11"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

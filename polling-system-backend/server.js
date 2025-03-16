@@ -396,23 +396,22 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("vote", async (data) => {
+    const { optionId, userId, isAnonymous } = data;
+    
+    // Convert isAnonymous to a proper 0 or 1 and log for debugging
+    const normalizedIsAnonymous = isAnonymous === true || isAnonymous === 1 || isAnonymous === "1" ? 1 : 0;
+    console.log(`[SOCKET] Vote received: optionId=${optionId}, userId=${userId}, original isAnonymous=${isAnonymous}, normalized=${normalizedIsAnonymous}`);
+    
     try {
-      console.log("[DEBUG] Vote received:", data);
-      const { optionId, userId } = data;
+      // Use the normalized anonymous flag
+      await vote(optionId, userId, normalizedIsAnonymous);
       
-      // Check for required parameters
-      if (!optionId || !userId) {
-        throw new Error("Invalid vote data: optionId and userId are required");
-      }
-      
-      // Call the vote function with both parameters
-      await vote(optionId, userId);
-      
-      // Emit updated polls to all clients
+      // Refresh polls for all clients
       const updatedPolls = await getPolls();
       io.emit("pollsUpdated", updatedPolls);
+      console.log(`[SOCKET] Vote processed successfully: optionId=${optionId}, userId=${userId}, anonymous=${normalizedIsAnonymous}`);
     } catch (error) {
-      console.error("[ERROR] Error processing vote:", error);
+      console.error("Error processing vote:", error.message);
       socket.emit("error", { message: error.message });
     }
   });

@@ -8,6 +8,7 @@ export type PollOption = {
     votes: number;
     voters: string; // Comma-separated list of voter IDs
     index: number; // Adding index property that exists in the backend
+    anonymous: string; // Adding anonymous property that exists in the backend
 };
 
 /**
@@ -309,9 +310,12 @@ export const convertToBase64Uri = (pic: any): string => {
 interface VoterInfo {
   user_id: number | string;
   email?: string;
+  username?: string;
   first_name?: string;
   last_name?: string;
   profile_picture?: string | null;
+  is_anonymous?: boolean;
+  displayId?: string;
 }
 
 export default{}

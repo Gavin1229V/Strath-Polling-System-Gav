@@ -34,78 +34,97 @@ interface VoterInfo {
   last_name?: string;
   profile_picture?: string | null;
   anonymous_index?: number;  // Add this property for anonymous participants
+  is_anonymous?: boolean;    // Add this property for anonymous voting check
+  displayId?: string;  // Add this property to fix the TypeScript error
 }
 
-// Create a separate component for the voter list to avoid hook ordering issues
-const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }) => {
+// Update the VotersList component to display more user information
+const VotersList = ({ pollId, poll }: { pollId: number, poll: Poll }) => {
   const [voters, setVoters] = useState<VoterInfo[]>([]);
   const [loadingVoters, setLoadingVoters] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch voter data when the component mounts or voterIds change
   useEffect(() => {
-    if (voterIds.length === 0) return;
+    if (!poll || !poll.options || poll.options.length === 0) return;
     
     const fetchVoters = async () => {
       setLoadingVoters(true);
       setError(null);
       try {
-        // Count the anonymous voters for debugging
-        const anonymousCount = voterIds.filter(id => id === "1").length;
-        console.log(`[DEBUG] Poll ${pollId} - Fetching voter info for ${voterIds.length} voters (${anonymousCount} anonymous)`);
+        // Create arrays to store all voter IDs and their anonymous status
+        let allVoterIds: string[] = [];
+        let anonymousFlags: {[key: string]: boolean} = {};
         
-        if (anonymousCount > 0) {
-          console.log(`[DEBUG] Anonymous voter IDs positions:`, 
-            voterIds.map((id, index) => id === "1" ? index : null).filter(idx => idx !== null)
-          );
-        }
-        
-        const response = await fetch(`${SERVER_IP}/api/users/batch`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userIds: voterIds }), // Send the exact array with duplicated "1"s
+        // Step 1: Collect all voter IDs and their anonymous status from all options
+        poll.options.forEach(option => {
+          if (option.voters && option.anonymous) {
+            const voterIds = option.voters.split(',').filter(id => id && id.trim());
+            const anonFlags = option.anonymous.split(',').filter(flag => flag !== undefined);
+            
+            // Make sure the arrays are the same length
+            const minLength = Math.min(voterIds.length, anonFlags.length);
+            
+            for (let i = 0; i < minLength; i++) {
+              const voterId = voterIds[i];
+              const isAnon = anonFlags[i] === '1';
+              
+              allVoterIds.push(voterId);
+              anonymousFlags[voterId] = isAnon;
+            }
+          } else if (option.voters) {
+            // Handle case where anonymous flags are missing
+            const voterIds = option.voters.split(',').filter(id => id && id.trim());
+            voterIds.forEach(id => {
+              allVoterIds.push(id);
+              anonymousFlags[id] = false;  // Default to non-anonymous
+            });
+          }
         });
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Failed to fetch voter info (${response.status}):`, errorText);
-          setError(`Server error: ${response.status}`);
+        console.log(`[DEBUG] Poll ${pollId} - Collected ${allVoterIds.length} total votes`);
+        
+        if (allVoterIds.length === 0) {
           setVoters([]);
           return;
         }
         
-        const data = await response.json();
-        console.log(`[DEBUG] Poll ${pollId} - Received ${data.length} voters from server`);
-        
-        // Check if we received the right number of anonymous participants
-        const receivedAnonymous = data.filter((v: VoterInfo) => v.user_id === 1 || v.user_id === "1");
-        console.log(`[DEBUG] Poll ${pollId} - Received ${receivedAnonymous.length} anonymous participants out of ${anonymousCount} expected`);
-        
-        if (receivedAnonymous.length > 0) {
-          console.log(`[DEBUG] Anonymous participants:`, receivedAnonymous.map((v: VoterInfo) => 
-            `${v.first_name} ${v.last_name || ''} (index: ${v.anonymous_index !== undefined ? v.anonymous_index : 'undefined'})`
-          ).join(', '));
-        }
-        
-        // The server already sorts with anonymous users at the end,
-        // but we can ensure it here as well
-        const sortedData = [...data].sort((a, b) => {
-          // Regular users first, anonymous users last
-          if ((a.user_id === 1 || a.user_id === "1") && (b.user_id !== 1 && b.user_id !== "1")) 
-            return 1;
-          if ((a.user_id !== 1 && a.user_id !== "1") && (b.user_id === 1 || b.user_id === "1")) 
-            return -1;
-          return 0;
+        // Step 2: Fetch user data for all voter IDs
+        const response = await fetch(`${SERVER_IP}/api/users/batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userIds: allVoterIds }),
         });
         
-        console.log(`[DEBUG] Poll ${pollId} - Sorted voters with regular users first, then anonymous`);
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
         
-        setVoters(sortedData);
+        const userData = await response.json();
+        const userMap: {[key: string]: VoterInfo} = {};
+        
+        // Map users by ID for easy lookup
+        userData.forEach((user: VoterInfo) => {
+          userMap[user.user_id.toString()] = user;
+        });
+        
+        // Step 3: Create the final voter list with anonymous flags
+        const finalVoters = allVoterIds.map((voterId, index) => {
+          const isAnonymous = anonymousFlags[voterId] || false;
+          const baseUser = userMap[voterId] || { user_id: voterId };
+          
+          return {
+            ...baseUser,
+            displayId: `${voterId}-${index}`, 
+            is_anonymous: isAnonymous
+          };
+        });
+        
+        console.log(`[DEBUG] Poll ${pollId} - Final participants: ${finalVoters.length}`);
+        setVoters(finalVoters);
+        
       } catch (error) {
-        console.error("Fetch error:", error);
-        setError("Network error");
+        console.error("Error fetching voters:", error);
+        setError(error instanceof Error ? error.message : "Unknown error");
         setVoters([]);
       } finally {
         setLoadingVoters(false);
@@ -113,15 +132,12 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
     };
     
     fetchVoters();
-  }, [pollId, voterIds.join(',')]);
-
-  // If no voters, return nothing
-  if (voterIds.length === 0) return null;
+  }, [poll, pollId]);
 
   return (
     <View style={{ marginTop: 20, width: '100%' }}>
       <Text style={[styles.infoTitle, { fontSize: 18, marginBottom: 10 }]}>
-        Poll Participants ({voterIds.length})
+        Poll Participants ({voters.length})
       </Text>
       
       {loadingVoters ? (
@@ -133,7 +149,7 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
       ) : voters.length > 0 ? (
         <FlatList
           data={voters}
-          keyExtractor={(item, index) => `voter-${item.user_id}-${item.anonymous_index !== undefined ? item.anonymous_index : ''}-${index}`}
+          keyExtractor={(item, index) => `voter-${item.displayId || index}`}
           horizontal={false}
           showsVerticalScrollIndicator={true}
           style={{ maxHeight: 200 }}
@@ -148,8 +164,8 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
             }}>
               <Image
                 source={{
-                  uri: item.user_id === 1 || item.user_id === "1"
-                    ? 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y' // Anonymous user image
+                  uri: item.is_anonymous
+                    ? 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
                     : processProfilePicture(item.profile_picture || null) || 
                       'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
                 }}
@@ -160,13 +176,20 @@ const VotersList = ({ pollId, voterIds }: { pollId: number, voterIds: string[] }
                   marginRight: 10
                 }}
               />
-              <Text style={{ fontSize: 14 }}>
-                {item.user_id === 1 || item.user_id === "1"
-                  ? "Anonymous Participant" // Always display anonymous users with this name, no numbering
-                  : (item.first_name && item.last_name 
-                      ? `${item.first_name} ${item.last_name}` 
-                      : (item.email || `User ${item.user_id}`))}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '500' }}>
+                  {item.is_anonymous
+                    ? "Anonymous Participant" 
+                    : (item.first_name && item.last_name 
+                        ? `${item.first_name} ${item.last_name}` 
+                        : (item.email || `User ${item.user_id}`))}
+                </Text>
+                {!item.is_anonymous && item.email && (
+                  <Text style={{ fontSize: 12, color: '#666' }}>
+                    {item.email}
+                  </Text>
+                )}
+              </View>
             </View>
           )}
         />
@@ -304,9 +327,13 @@ const PollView = () => {
     saveAnonymousVotes();
   }, [anonymousVotes]);
 
-  // Toggle anonymous mode and handle state persistence
+  // Toggle anonymous mode for more explicit handling
   const toggleAnonymousMode = useCallback(() => {
-    setAnonymousMode(prev => !prev);
+    setAnonymousMode(prevMode => {
+      const newMode = !prevMode;
+      console.log(`[CLIENT] Anonymous mode toggled: ${prevMode} → ${newMode}`);
+      return newMode;
+    });
   }, []);
 
   // Fetch polls and setup socket listeners with better error handling
@@ -432,25 +459,31 @@ const PollView = () => {
       return;
     }
     
-    // Check if this is an anonymous vote that was already cast
-    if (anonymousMode && anonymousVotes[optionId]) {
-      return;
-    }
-    
     setVoteLoading(true);
     
-    // Use user ID 1 for anonymous voting or the actual user ID otherwise
-    const voteUserId = anonymousMode ? 1 : user.user_id;
+    // Always send the actual user ID along with anonymous flag
+    const userId = user.user_id;
+    // Force to numeric 1 or 0 to ensure proper type
+    const isAnonymous = anonymousMode ? 1 : 0;
+    
+    console.log(`[CLIENT] Voting with anonymous mode: ${anonymousMode}, isAnonymous value: ${isAnonymous}, type: ${typeof isAnonymous}`);
     
     // Update local state immediately for a responsive UI
     setPolls((prevPolls) =>
       prevPolls.map((poll) => {
         const updatedOptions = poll.options.map((option) => {
           if (option.id === optionId) {
+            // Update both voters and anonymous columns
+            const newVoters = option.voters ? `${option.voters},${userId}` : `${userId}`;
+            const newAnonymous = option.anonymous ? `${option.anonymous},${isAnonymous}` : `${isAnonymous}`;
+            
+            console.log(`[CLIENT] Updated option ${option.id} anonymous flags: ${newAnonymous}`);
+            
             return { 
               ...option, 
               votes: option.votes + 1,
-              voters: option.voters ? `${option.voters},${voteUserId}` : `${voteUserId}`
+              voters: newVoters,
+              anonymous: newAnonymous
             };
           }
           return option;
@@ -459,16 +492,25 @@ const PollView = () => {
       })
     );
     
-    // If in anonymous mode, track this vote in anonymous votes
-    if (anonymousMode) {
-      setAnonymousVotes(prev => ({...prev, [optionId]: true}));
-    }
-    
     // Mark this option as voted by the user
     setUserVotes(prev => ({...prev, [optionId]: true}));
     
-    // Send vote to server with user ID (anonymous or real)
-    socketRef.current.emit("vote", { optionId, userId: voteUserId });
+    // If anonymous mode is on, track this vote in anonymousVotes state
+    if (isAnonymous === 1) {
+      const updatedAnonymousVotes = {...anonymousVotes, [optionId]: true};
+      setAnonymousVotes(updatedAnonymousVotes);
+      
+      // Persist to AsyncStorage
+      AsyncStorage.setItem('anonymousVotes', JSON.stringify(updatedAnonymousVotes))
+        .catch(err => console.error('Failed to save anonymous votes:', err));
+    }
+    
+    // IMPORTANT: Send the isAnonymous as an explicit number value
+    socketRef.current.emit("vote", { 
+      optionId, 
+      userId, 
+      isAnonymous
+    });
     
     // Remove spinner after short delay
     setTimeout(() => setVoteLoading(false), 2000);
@@ -614,18 +656,14 @@ const PollView = () => {
 
   // Render each poll card with anonymous vote check
   const renderPoll = ({ item }: { item: Poll }) => {
-    // Check if user has voted in this poll
+    // Check if user has voted in this poll (either normally or anonymously)
     const userVotedInPoll = item.options.some(option => 
-      userVotes[option.id]
-    );
-    
-    // Check if anonymous user has voted in this poll
-    const anonymousVotedInPoll = anonymousMode && item.options.some(option => 
-      anonymousVotes[option.id]
+      userVotes[option.id] || // Normal vote
+      (anonymousVotes[option.id]) // Anonymous vote
     );
     
     // Determine if voting is disabled
-    const votingDisabled = voteLoading || userVotedInPoll || anonymousVotedInPoll;
+    const votingDisabled = voteLoading || userVotedInPoll;
     
     return (
       <View style={[styles.pollCard, isMobile && { marginHorizontal: 5, padding: 10 }]}>
@@ -953,7 +991,7 @@ const PollView = () => {
             {infoPoll && 
               <VotersList 
                 pollId={infoPoll.id}
-                voterIds={getUniqueVotersFromPoll(infoPoll)}
+                poll={infoPoll}
               />
             }
           </View>
