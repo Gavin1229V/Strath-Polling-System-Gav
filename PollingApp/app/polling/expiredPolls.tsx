@@ -15,11 +15,11 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import styles from "../styles/styles";
-import { fetchPolls, getSocket, processProfilePicture } from "./global";
-import { SERVER_IP } from "./config";
-import { Poll } from "./global";
-import { useAuth, useUserRole } from "./userDetails";
+import styles from "../../styles/styles";
+import { fetchPolls, getSocket, processProfilePicture } from "../global";
+import { SERVER_IP } from "../config";
+import { Poll } from "../global";
+import { useAuth, useUserRole } from "../userDetails";
 import { useRouter } from "expo-router";
 import { VictoryPie } from "victory-native/lib/components/victory-pie";
 import { VotersList } from "./pollView"; // Reusing the VotersList component

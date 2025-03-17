@@ -6,7 +6,8 @@ import { SERVER_IP } from "./config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import globalStyles from "../styles/styles"; // Import global styles
 
-// Hardcoded mapping for each year
+//if I was doing this for a real app, I would have used a database to store the classes
+//and the user's selected classes, but for the sake of this project, I will use a hardcoded mapping
 const yearClassMapping: Record<string, string[]> = {
   "Year 1": [
     "CS101 - Topics in Computing 1",

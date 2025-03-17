@@ -16,8 +16,6 @@ function InnerLayout() {
     }
   }, [user, pathname]);
 
-  const hideNavBarRoutes = ["/", "/login", "/registerPage"];
-  const shouldHideNavBar = hideNavBarRoutes.includes(pathname);
 
   return (
     <View style={styles.container}>
@@ -66,7 +64,7 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="pollCreator"
+            name="polling/pollCreator"
             options={{
               title: "Poll Creation",
               headerBackVisible: false,
@@ -74,7 +72,7 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="pollView"
+            name="polling/pollView"
             options={{
               title: "Your Polls",
               headerBackVisible: false,
@@ -89,7 +87,7 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="elections"
+            name="election/elections"
             options={{
               title: "Student Elections",
               headerBackVisible: false,
@@ -97,21 +95,21 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="electionDetail"
+            name="election/electionDetail"
             options={{
               title: "Election Details",
               headerBackVisible: true,
             }}
           />
           <Stack.Screen
-            name="createElection"
+            name="election/createElection"
             options={{
               title: "Create Election",
               headerBackVisible: true,
             }}
           />
           <Stack.Screen
-            name="expiredPolls"
+            name="polling/expiredPolls"
             options={{
               title: "Expired Polls",
               headerBackVisible: true,

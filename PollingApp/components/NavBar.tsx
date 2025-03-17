@@ -23,10 +23,8 @@ const NavBar = () => {
   // Check if user is a lecturer (role === 3)
   const isLecturer = userRole === 3;
   
-  // Check if user is an instructor (specifically role === 3)
-  const isInstructor = userRole === 3;
-  
-  const isActive = (route: string): boolean => pathname === route;
+  // Updated isActive function to check if pathname includes the route segment
+  const isActive = (route: string): boolean => pathname.includes(route);
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
@@ -46,34 +44,34 @@ const NavBar = () => {
           </Text>
         </TouchableOpacity>
         
-        {(isInstructor || isStudentRep) && (
+        {(isLecturer || isStudentRep) && (
           <TouchableOpacity 
-            style={[styles.navButton, isActive("/pollCreator") && styles.activeNavButton]} 
-            onPress={() => router.replace("/pollCreator")}
+            style={[styles.navButton, isActive("/polling/pollCreator") && styles.activeNavButton]} 
+            onPress={() => router.replace("/polling/pollCreator")}
             accessibilityLabel="Create Poll"
           >
             <Ionicons 
               name="create" 
               size={24} 
-              color={isActive("/pollCreator") ? "#007bff" : "#ffffff"} 
+              color={isActive("/polling/pollCreator") ? "#007bff" : "#ffffff"} 
             />
-            <Text style={[styles.navText, isActive("/pollCreator") && styles.activeNavText]}>
+            <Text style={[styles.navText, isActive("/polling/pollCreator") && styles.activeNavText]}>
               Create
             </Text>
           </TouchableOpacity>
         )}
         
         <TouchableOpacity 
-          style={[styles.navButton, isActive("/pollView") && styles.activeNavButton]} 
-          onPress={() => router.replace("/pollView")}
+          style={[styles.navButton, isActive("/polling/pollView") && styles.activeNavButton]} 
+          onPress={() => router.replace("/polling/pollView")}
           accessibilityLabel="View Polls"
         >
           <Ionicons 
             name="list" 
             size={24} 
-            color={isActive("/pollView") ? "#007bff" : "#ffffff"} 
+            color={isActive("/polling/pollView") ? "#007bff" : "#ffffff"} 
           />
-          <Text style={[styles.navText, isActive("/pollView") && styles.activeNavText]}>
+          <Text style={[styles.navText, isActive("/polling/pollView") && styles.activeNavText]}>
             Polls
           </Text>
         </TouchableOpacity>
@@ -81,17 +79,35 @@ const NavBar = () => {
         {/* Elections tab - visible for students (role === 1), student reps (role === 2) and lecturers (role === 3) */}
         {(isStudent || isStudentRep || isLecturer) && (
           <TouchableOpacity 
-            style={[styles.navButton, isActive("/elections") && styles.activeNavButton]} 
-            onPress={() => router.replace("/elections")}
+            style={[styles.navButton, isActive("/election/elections") && styles.activeNavButton]} 
+            onPress={() => router.replace("/election/elections")}
             accessibilityLabel="Student Elections"
           >
             <Ionicons 
               name="people" 
               size={24} 
-              color={isActive("/elections") ? "#007bff" : "#ffffff"} 
+              color={isActive("/election/elections") ? "#007bff" : "#ffffff"} 
             />
-            <Text style={[styles.navText, isActive("/elections") && styles.activeNavText]}>
+            <Text style={[styles.navText, isActive("/election/elections") && styles.activeNavText]}>
               Elections
+            </Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Add a new tab for Expired Polls - visible only for student reps and lecturers */}
+        {(isStudentRep || isLecturer) && (
+          <TouchableOpacity 
+            style={[styles.navButton, isActive("/polling/expiredPolls") && styles.activeNavButton]} 
+            onPress={() => router.replace("/polling/expiredPolls")}
+            accessibilityLabel="Expired Polls"
+          >
+            <Ionicons 
+              name="time" 
+              size={24} 
+              color={isActive("/polling/expiredPolls") ? "#007bff" : "#ffffff"} 
+            />
+            <Text style={[styles.navText, isActive("/polling/expiredPolls") && styles.activeNavText]}>
+              Expired
             </Text>
           </TouchableOpacity>
         )}

@@ -12,9 +12,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { useAuth } from "./userDetails";
-import { SERVER_IP } from "./config";
-import styles from "../styles/styles";
+import { useAuth } from "../userDetails";
+import { SERVER_IP } from "../config";
+import styles from "../../styles/styles";
 
 // Default end date (2 weeks from now)
 const getDefaultEndDate = () => {
@@ -144,7 +144,7 @@ const CreateElectionScreen = () => {
       Alert.alert(
         "Success",
         "Election created successfully",
-        [{ text: "OK", onPress: () => router.push("/elections") }]
+        [{ text: "OK", onPress: () => router.push("/election/elections") }]
       );
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to create election. Please try again.");

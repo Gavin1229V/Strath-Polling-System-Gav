@@ -8,7 +8,6 @@ import { useAuth, useFirstName, useLastName } from "./userDetails";
 import { useRouter } from "expo-router";
 import { SERVER_IP } from "./config";
 import * as ImagePicker from "expo-image-picker";
-import { Buffer } from "buffer";
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSocket, convertToBase64Uri, processProfilePicture } from "./global";
@@ -178,7 +177,7 @@ const HomeScreen = () => {
   // Add navigation function to view polls filtered by class
   const navigateToFilteredPolls = (classCode: string) => {
     router.push({
-      pathname: "/pollView",
+      pathname: "/polling/pollView",
       params: { activeFilter: classCode }
     });
   };
@@ -373,7 +372,7 @@ const HomeScreen = () => {
           
           {/* Student Elections Section - updated for roles */}
           <TouchableOpacity
-            onPress={() => router.push("/elections")}
+            onPress={() => router.push("/election/elections")}
             style={{
               width: '100%',
               backgroundColor: "#fff",
@@ -433,7 +432,7 @@ const HomeScreen = () => {
                 </View>
                 
                 <TouchableOpacity
-                  onPress={() => router.push("/createElection")}
+                  onPress={() => router.push("/election/createElection")}
                   style={{
                     backgroundColor: "#4CAF50",
                     padding: 12,
@@ -457,7 +456,7 @@ const HomeScreen = () => {
           {/* Add Expired Polls Section for Student Reps and Lecturers */}
           {user && (user.role === 2 || user.role === 3) && (
             <TouchableOpacity
-              onPress={() => router.push("/expiredPolls")}
+              onPress={() => router.push("/polling/expiredPolls")}
               style={{
                 width: '100%',
                 backgroundColor: "#fff",

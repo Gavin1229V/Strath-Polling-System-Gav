@@ -16,11 +16,11 @@ import {
   Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons"; // Make sure Ionicons is imported
-import styles from "../styles/styles";
-import { fetchPolls, getSocket, processProfilePicture } from "./global";
-import { SERVER_IP } from "./config";
-import { Poll } from "./global";
-import { useUserClasses, useAuth } from "./userDetails";
+import styles from "../../styles/styles";
+import { fetchPolls, getSocket, processProfilePicture } from "../global";
+import { SERVER_IP } from "../config";
+import { Poll } from "../global";
+import { useUserClasses, useAuth } from "../userDetails";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { VictoryPie } from "victory-native/lib/components/victory-pie";
 import AsyncStorage from '@react-native-async-storage/async-storage';

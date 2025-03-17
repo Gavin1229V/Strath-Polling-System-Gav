@@ -10,9 +10,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "./userDetails";
-import { SERVER_IP } from "./config";
-import styles from "../styles/styles";
+import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "../userDetails";
+import { SERVER_IP } from "../config";
+import styles from "../../styles/styles";
 
 interface Election {
   id: number;
@@ -97,12 +97,12 @@ const ElectionsScreen = () => {
 
   // Navigate to election details
   const viewElection = (election: Election) => {
-    router.push(`/electionDetail?id=${election.id}`);
+    router.push(`/election/electionDetail?id=${election.id}`);
   };
 
   // Create a new election
   const createElection = () => {
-    router.push("/createElection");
+    router.push("/election/createElection");
   };
 
   if (loading) {

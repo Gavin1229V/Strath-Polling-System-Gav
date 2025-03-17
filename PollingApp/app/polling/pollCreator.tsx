@@ -4,26 +4,21 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
   ScrollView,
   Platform,
   StyleSheet,
   ActivityIndicator,
   Modal,
-  Pressable,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from '@react-native-picker/picker';
-import { fetchPolls, getSocket } from "./global";
-import { SERVER_IP } from "./config";
-import { useFirstName, useLastName, useAuth, useUserClasses, useUserRole } from "./userDetails";
-import { Poll } from "./global";
-import styles from "../styles/styles"; // Use global styles
+import { fetchPolls, getSocket } from "../global";
+import { SERVER_IP } from "../config";
+import { useFirstName, useLastName, useAuth, useUserClasses, useUserRole } from "../userDetails";
+import { Poll } from "../global";
+import styles from "../../styles/styles"; // Use global styles
 import { Ionicons } from '@expo/vector-icons';
 
-////////////////////////////////////////////////////////////////////////////////
-// Compute default expiry value (one day ahead)
-////////////////////////////////////////////////////////////////////////////////
 const getDefaultExpiry = () => {
   const defaultExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const year = defaultExpiry.getFullYear();
@@ -221,9 +216,6 @@ const localStyles = StyleSheet.create({
   }
 });
 
-////////////////////////////////////////////////////////////////////////////////
-// Main component
-////////////////////////////////////////////////////////////////////////////////
 const PollScreen = () => {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [newPoll, setNewPoll] = useState({
@@ -265,10 +257,6 @@ const PollScreen = () => {
   const firstName = useFirstName();
   const lastName = useLastName();
   const author = `${firstName} ${lastName}`.trim();
-
-  // For native date/time pickers
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Load polls initially
   useEffect(() => {
@@ -566,31 +554,17 @@ const PollScreen = () => {
                             setShowClassPicker(false);
                           }
                         }}
-                        style={{ 
-                          color: '#333',
-                          height: Platform.OS === 'android' ? 48 * classesList.length : undefined,
-                        }}
+                        style={{ color: '#333' }}
                         itemStyle={{ 
                           color: '#333', 
                           fontSize: 16, 
-                          height: Platform.OS === 'ios' ? 120 : undefined, // Taller items on iOS
+                          height: Platform.OS === 'ios' ? 120 : undefined,
                           lineHeight: Platform.OS === 'ios' ? 36 : undefined 
                         }}
                       >
-                        <Picker.Item 
-                          label="- Select a class -" 
-                          value="" 
-                          color="#999"
-                          style={Platform.OS === 'android' ? localStyles.pickerItem : undefined} 
-                        />
+                        <Picker.Item label="- Select a class -" value="" color="#999" />
                         {classesList.map((cls, index) => (
-                          <Picker.Item 
-                            key={index} 
-                            label={cls} 
-                            value={cls} 
-                            color="#333" // Explicit color for all items
-                            style={Platform.OS === 'android' ? localStyles.pickerItem : undefined}
-                          />
+                          <Picker.Item key={index} label={cls} value={cls} color="#333" />
                         ))}
                       </Picker>
                     </View>
@@ -652,7 +626,7 @@ const PollScreen = () => {
                 />
               </View>
             </View>
-          ) : Platform.OS === "ios" ? (
+          ) : (
             // iOS implementation
             <View style={localStyles.dateTimeRow}>
               <View style={{ flex: 1, marginRight: 8 }}>
@@ -703,93 +677,6 @@ const PollScreen = () => {
                   style={{ width: '100%' }}
                 />
               </View>
-            </View>
-          ) : (
-            // Android implementation
-            <View>
-              <View style={localStyles.dateTimeRow}>
-                <TouchableOpacity
-                  style={[localStyles.dateTimeButton, { marginRight: 8 }]}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text style={localStyles.dateTimeText}>
-                    {formatDate(newPoll.expiryDate)}
-                  </Text>
-                  <Ionicons name="calendar-outline" size={18} color="#666" />
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[localStyles.dateTimeButton, { marginLeft: 8 }]}
-                  onPress={() => setShowTimePicker(true)}
-                >
-                  <Text style={localStyles.dateTimeText}>
-                    {newPoll.expiryTime || "Select time"}
-                  </Text>
-                  <Ionicons name="time-outline" size={18} color="#666" />
-                </TouchableOpacity>
-              </View>
-              
-              {showDatePicker && (
-                <View style={{ marginTop: 16 }}>
-                  <DateTimePicker
-                    mode="date"
-                    display="spinner"
-                    value={
-                      newPoll.expiryDate
-                        ? new Date(newPoll.expiryDate)
-                        : new Date(Date.now() + 24 * 60 * 60 * 1000)
-                    }
-                    onChange={(event, selectedDate) => {
-                      if (selectedDate) {
-                        const year = selectedDate.getFullYear();
-                        const month = ("0" + (selectedDate.getMonth() + 1)).slice(-2);
-                        const day = ("0" + selectedDate.getDate()).slice(-2);
-                        setNewPoll((prev) => ({
-                          ...prev,
-                          expiryDate: `${year}-${month}-${day}`,
-                        }));
-                      }
-                    }}
-                  />
-                  <TouchableOpacity
-                    style={styles.blueButton} // Use global blue button style
-                    onPress={() => setShowDatePicker(false)}
-                  >
-                    <Text style={styles.blueButtonText}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              
-              {showTimePicker && (
-                <View style={{ marginTop: 16 }}>
-                  <DateTimePicker
-                    mode="time"
-                    display="spinner"
-                    is24Hour={true}
-                    value={
-                      newPoll.expiryTime
-                        ? new Date(`1970-01-01T${newPoll.expiryTime}:00`)
-                        : new Date()
-                    }
-                    onChange={(event, selectedTime) => {
-                      if (selectedTime) {
-                        const hours = ("0" + selectedTime.getHours()).slice(-2);
-                        const minutes = ("0" + selectedTime.getMinutes()).slice(-2);
-                        setNewPoll((prev) => ({
-                          ...prev,
-                          expiryTime: `${hours}:${minutes}`,
-                        }));
-                      }
-                    }}
-                  />
-                  <TouchableOpacity
-                    style={styles.blueButton} // Use global blue button style
-                    onPress={() => setShowTimePicker(false)}
-                  >
-                    <Text style={styles.blueButtonText}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
             </View>
           )}
         </View>
