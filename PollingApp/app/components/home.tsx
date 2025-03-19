@@ -1,28 +1,15 @@
-if (typeof global.Buffer === "undefined") {
-  global.Buffer = require("buffer").Buffer;
-}
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, Text, TouchableOpacity, Image, Dimensions, Platform, StatusBar, RefreshControl, ScrollView, ActivityIndicator } from "react-native";
 import { useAuth, useFirstName, useLastName } from "./userDetails";
 import { useRouter } from "expo-router";
-import { SERVER_IP } from "./config";
+import { SERVER_IP } from "../config";
 import * as ImagePicker from "expo-image-picker";
-import { Buffer } from "buffer";
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSocket, convertToBase64Uri, processProfilePicture } from "./global";
 import { Ionicons } from "@expo/vector-icons";
-import styles from "../styles/styles";
+import styles from "../../styles/styles";
 
-// Define the AuthUser type to match what the useAuth hook expects
-type AuthUser = {
-  user_id: number;
-  classes?: string;
-  profile_picture?: string;
-  role?: number;
-  // Add other properties that exist in the user object
-};
 
 const HomeScreen = () => {
   const { user, setUser } = useAuth();
@@ -178,7 +165,7 @@ const HomeScreen = () => {
   // Add navigation function to view polls filtered by class
   const navigateToFilteredPolls = (classCode: string) => {
     router.push({
-      pathname: "/pollView",
+      pathname: "/polling/pollView",
       params: { activeFilter: classCode }
     });
   };
@@ -351,7 +338,7 @@ const HomeScreen = () => {
                 styles.blueButton, // Using the new global style
                 { marginTop: 20, minWidth: width * 0.3 }
               ]}
-              onPress={() => router.push("/settings")}
+              onPress={() => router.push("/components/settings")}
               accessibilityLabel="Settings"
               accessibilityRole="button"
             >
@@ -373,7 +360,7 @@ const HomeScreen = () => {
           
           {/* Student Elections Section - updated for roles */}
           <TouchableOpacity
-            onPress={() => router.push("/elections")}
+            onPress={() => router.push("/election/elections")}
             style={{
               width: '100%',
               backgroundColor: "#fff",
@@ -433,7 +420,7 @@ const HomeScreen = () => {
                 </View>
                 
                 <TouchableOpacity
-                  onPress={() => router.push("/createElection")}
+                  onPress={() => router.push("../creation/electionCreator")}
                   style={{
                     backgroundColor: "#4CAF50",
                     padding: 12,
@@ -457,7 +444,7 @@ const HomeScreen = () => {
           {/* Add Expired Polls Section for Student Reps and Lecturers */}
           {user && (user.role === 2 || user.role === 3) && (
             <TouchableOpacity
-              onPress={() => router.push("/expiredPolls")}
+              onPress={() => router.push("/polling/expiredPolls")}
               style={{
                 width: '100%',
                 backgroundColor: "#fff",
@@ -493,7 +480,7 @@ const HomeScreen = () => {
                 <Text style={{ color: "#6A1B9A", flex: 1 }}>
                   {user.role === 2 
                     ? "As a student representative, you can see expired polls for your year group." 
-                    : "As a lecturer, you can access all expired polls."}
+                    : "As a lecturer, you can access your expired polls."}
                 </Text>
               </View>
             </TouchableOpacity>

@@ -15,12 +15,12 @@ const router = require("./pollRouter");
 const pollRouter = require("./pollRouter");
 const electionRouter = require("./electionRouter"); // Add this line
 const { getPolls, vote } = require("./polling");
+const { checkAndMoveExpiredPolls } = require("./expiredPolls"); // Add import for expired polls
 const { registerAndSendEmail, verifyEmail } = require("./register");
 const { loginUser } = require("./login");
 const verificationRouter = require("./verify");
 const { getAccountDetails } = require("./accountDetailGetter");
 const { updateUserClasses } = require("./classHelper");
-
 
 // Create a cache with 5 minute TTL
 const pollCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
@@ -471,6 +471,44 @@ runMigrations()
     console.error("Migration error:", err);
     // You might want to still start the server despite migration errors
   });
+
+// Check for expired polls on server startup and then every minute
+const checkExpiredPollsAndMove = async () => {
+  console.log("[INFO] Checking for expired polls to move...");
+  try {
+    // Check if there are likely to be expired polls before querying
+    const now = new Date();
+    const lastMinuteKey = `last_expiry_check_${now.getMinutes()}`;
+    
+    // Only perform the full check if we haven't checked in this specific minute
+    if (!pollCache.get(lastMinuteKey)) {
+      const result = await checkAndMoveExpiredPolls();
+      
+      if (result.total > 0) {
+        console.log(`[INFO] Moved ${result.moved} of ${result.total} expired polls`);
+      } else {
+        console.log("[INFO] No expired polls found to move");
+      }
+      
+      // If any polls were moved, invalidate cache
+      if (result.moved > 0) {
+        invalidatePollCache();
+      }
+      
+      // Mark that we've checked in this minute
+      pollCache.set(lastMinuteKey, true, 60); // TTL of 60 seconds
+    }
+  } catch (error) {
+    console.error("[ERROR] Failed to check expired polls:", error);
+  }
+};
+
+// First check on startup
+checkExpiredPollsAndMove();
+
+// Then schedule to run every minute (changed from every hour)
+console.log("[INFO] Setting up expired polls check to run every minute");
+setInterval(checkExpiredPollsAndMove, 60 * 1000); // 60 seconds * 1000 ms
 
 // Start the server
 server.listen(PORT, () => {

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { createPoll, getPolls, vote } = require("./polling"); // Import functions from polling.js
+const { getExpiredPolls } = require("./expiredPolls"); // Add this import
 
 // API Routes
 router.post("/", async (req, res) => {
@@ -17,6 +18,16 @@ router.get("/", async (req, res) => {
     try {
         const polls = await getPolls();
         res.json(polls);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add new endpoint for expired polls
+router.get("/expired", async (req, res) => {
+    try {
+        const expiredPolls = await getExpiredPolls();
+        res.json(expiredPolls);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -1,11 +1,11 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity, Text, Dimensions } from "react-native";
 import { usePathname, useRouter } from "expo-router";
-import { useUserRole } from "../app/userDetails";
+import { useUserRole } from "./userDetails";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 
-const hideNavBarRoutes = ["/", "/login", "/registerPage"];
+const hideNavBarRoutes = ["/", "/auth/index", "/auth/login", "/auth/registerPage"];
 
 const NavBar = () => {
   const pathname = usePathname();
@@ -26,54 +26,55 @@ const NavBar = () => {
   // Check if user is an instructor (specifically role === 3)
   const isInstructor = userRole === 3;
   
-  const isActive = (route: string): boolean => pathname === route;
+  // Update path checks to match the file structure
+  const isActive = (route: string): boolean => pathname.includes(route);
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
       <View style={styles.navbar}>
         <TouchableOpacity 
-          style={[styles.navButton, isActive("/home") && styles.activeNavButton]} 
-          onPress={() => router.replace("/home")}
+          style={[styles.navButton, isActive("/components/home") && styles.activeNavButton]} 
+          onPress={() => router.replace("/components/home")}
           accessibilityLabel="Home"
         >
           <Ionicons 
             name="home" 
             size={24} 
-            color={isActive("/home") ? "#007bff" : "#ffffff"} 
+            color={isActive("/components/home") ? "#007bff" : "#ffffff"} 
           />
-          <Text style={[styles.navText, isActive("/home") && styles.activeNavText]}>
+          <Text style={[styles.navText, isActive("/components/home") && styles.activeNavText]}>
             Home
           </Text>
         </TouchableOpacity>
         
         {(isInstructor || isStudentRep) && (
           <TouchableOpacity 
-            style={[styles.navButton, isActive("/pollCreator") && styles.activeNavButton]} 
-            onPress={() => router.replace("/pollCreator")}
+            style={[styles.navButton, isActive("/creation/pollCreator") && styles.activeNavButton]} 
+            onPress={() => router.replace("/creation/pollCreator")}
             accessibilityLabel="Create Poll"
           >
             <Ionicons 
               name="create" 
               size={24} 
-              color={isActive("/pollCreator") ? "#007bff" : "#ffffff"} 
+              color={isActive("/creation/pollCreator") ? "#007bff" : "#ffffff"} 
             />
-            <Text style={[styles.navText, isActive("/pollCreator") && styles.activeNavText]}>
+            <Text style={[styles.navText, isActive("/creation/pollCreator") && styles.activeNavText]}>
               Create
             </Text>
           </TouchableOpacity>
         )}
         
         <TouchableOpacity 
-          style={[styles.navButton, isActive("/pollView") && styles.activeNavButton]} 
-          onPress={() => router.replace("/pollView")}
+          style={[styles.navButton, isActive("/polling/pollView") && styles.activeNavButton]} 
+          onPress={() => router.replace("/polling/pollView")}
           accessibilityLabel="View Polls"
         >
           <Ionicons 
             name="list" 
             size={24} 
-            color={isActive("/pollView") ? "#007bff" : "#ffffff"} 
+            color={isActive("/polling/pollView") ? "#007bff" : "#ffffff"} 
           />
-          <Text style={[styles.navText, isActive("/pollView") && styles.activeNavText]}>
+          <Text style={[styles.navText, isActive("/polling/pollView") && styles.activeNavText]}>
             Polls
           </Text>
         </TouchableOpacity>
@@ -81,16 +82,16 @@ const NavBar = () => {
         {/* Elections tab - visible for students (role === 1), student reps (role === 2) and lecturers (role === 3) */}
         {(isStudent || isStudentRep || isLecturer) && (
           <TouchableOpacity 
-            style={[styles.navButton, isActive("/elections") && styles.activeNavButton]} 
-            onPress={() => router.replace("/elections")}
+            style={[styles.navButton, isActive("/election/elections") && styles.activeNavButton]} 
+            onPress={() => router.replace("/election/elections")}
             accessibilityLabel="Student Elections"
           >
             <Ionicons 
               name="people" 
               size={24} 
-              color={isActive("/elections") ? "#007bff" : "#ffffff"} 
+              color={isActive("/election/elections") ? "#007bff" : "#ffffff"} 
             />
-            <Text style={[styles.navText, isActive("/elections") && styles.activeNavText]}>
+            <Text style={[styles.navText, isActive("/election/elections") && styles.activeNavText]}>
               Elections
             </Text>
           </TouchableOpacity>

@@ -1,4 +1,4 @@
-import { SERVER_IP } from "./config";
+import { SERVER_IP } from "../config";
 import { io, Socket } from "socket.io-client";
 import { Platform } from "react-native";
 

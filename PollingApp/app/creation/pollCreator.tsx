@@ -14,16 +14,12 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from '@react-native-picker/picker';
-import { fetchPolls, getSocket } from "./global";
-import { SERVER_IP } from "./config";
-import { useFirstName, useLastName, useAuth, useUserClasses, useUserRole } from "./userDetails";
-import { Poll } from "./global";
-import styles from "../styles/styles"; // Use global styles
+import { fetchPolls, getSocket, Poll } from "../components/global";
+import { SERVER_IP } from "../config";
+import { useFirstName, useLastName, useAuth, useUserClasses, useUserRole } from "../components/userDetails";
+import styles from "../../styles/styles"; // Use global styles
 import { Ionicons } from '@expo/vector-icons';
 
-////////////////////////////////////////////////////////////////////////////////
-// Compute default expiry value (one day ahead)
-////////////////////////////////////////////////////////////////////////////////
 const getDefaultExpiry = () => {
   const defaultExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const year = defaultExpiry.getFullYear();
@@ -221,9 +217,6 @@ const localStyles = StyleSheet.create({
   }
 });
 
-////////////////////////////////////////////////////////////////////////////////
-// Main component
-////////////////////////////////////////////////////////////////////////////////
 const PollScreen = () => {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [newPoll, setNewPoll] = useState({

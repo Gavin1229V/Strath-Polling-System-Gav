@@ -81,3 +81,27 @@ CREATE TABLE poll_options (
         year_group INT NOT NULL,
         FOREIGN KEY (created_by) REFERENCES users(user_id)
       )
+
+        CREATE TABLE expired_polls_options (
+          id INT PRIMARY KEY,
+          poll_id INT NOT NULL,
+          option_index INT NOT NULL,
+          option_text TEXT NOT NULL,
+          vote_count INT DEFAULT 0,
+          voters TEXT,
+          anonymous TEXT,
+          FOREIGN KEY (poll_id) REFERENCES expired_polls(id)
+        )
+
+
+      CREATE TABLE expired_polls (
+          id INT PRIMARY KEY,
+          question TEXT NOT NULL,
+          created_by VARCHAR(255) NOT NULL,
+          created_by_id INT NOT NULL,
+          created_at DATETIME NOT NULL,
+          class VARCHAR(255),
+          expiry DATETIME,
+          year_group INT,
+          moved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )

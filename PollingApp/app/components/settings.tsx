@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { useAuth } from "./userDetails";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SERVER_IP } from "./config";
-import styles from "../styles/styles"; // Import global styles
+import { SERVER_IP } from "../config";
+import styles from "../../styles/styles"; // Import global styles
 
 const Settings = () => {
   const { user, setUser } = useAuth();
@@ -12,7 +12,7 @@ const Settings = () => {
 
   const handleLogout = () => {
     setUser(null);
-    router.replace("/");
+    router.replace("../auth/index");
   };
 
   const handleRemoveProfilePic = async () => {
@@ -26,7 +26,7 @@ const Settings = () => {
       if (data.success) {
         await AsyncStorage.removeItem("profile_picture");
         setUser({ ...user, profile_picture: undefined });
-        router.replace("/");  // added redirect to home
+        router.replace("/components/home");  // Fixed path
       } else {
         console.error("Error removing profile picture:", data.error);
       }
@@ -35,7 +35,7 @@ const Settings = () => {
 
   return (
     <View style={[styles.container, { justifyContent: 'center', flex: 0.9 }]}>
-      <TouchableOpacity style={styles.button} onPress={() => router.push("/classChooser")}>
+      <TouchableOpacity style={styles.button} onPress={() => router.push("/components/classChooser")}>
         <Text style={styles.buttonText}>Change Classes</Text>
       </TouchableOpacity>
       <TouchableOpacity 

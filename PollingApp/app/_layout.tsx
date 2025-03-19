@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { View, StyleSheet } from "react-native";
-import { AuthProvider, useAuth } from "./userDetails";
-import NavBar from "../components/NavBar"; // updated import path
+import { AuthProvider, useAuth } from "./components/userDetails";
+import NavBar from "./components/NavBar";
 
 function InnerLayout() {
   const pathname = usePathname();
@@ -11,13 +11,10 @@ function InnerLayout() {
 
   // Redirect to home if logged in and on index route
   useEffect(() => {
-    if (user && (pathname === "/" || pathname === "/index")) {
-      router.replace("/home");
+    if (user && (pathname === "/" || pathname === "/auth/index")) {
+      router.replace("/components/home");
     }
   }, [user, pathname]);
-
-  const hideNavBarRoutes = ["/", "/login", "/registerPage"];
-  const shouldHideNavBar = hideNavBarRoutes.includes(pathname);
 
   return (
     <View style={styles.container}>
@@ -37,21 +34,21 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="login"
+            name="auth/login"
             options={{
               title: "Login",
               headerBackVisible: true,
             }}
           />
           <Stack.Screen
-            name="registerPage"
+            name="auth/registerPage"
             options={{
               title: "Register",
               headerBackVisible: true,
             }}
           />
           <Stack.Screen
-            name="home"
+            name="components/home"
             options={{
               title: "Home",
               headerBackVisible: false,
@@ -59,14 +56,14 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="classChooser"
+            name="components/classChooser"
             options={{
               title: "Choose Your Classes Here",
               headerBackVisible: true,
             }}
           />
           <Stack.Screen
-            name="pollCreator"
+            name="creation/pollCreator"
             options={{
               title: "Poll Creation",
               headerBackVisible: false,
@@ -74,7 +71,7 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="pollView"
+            name="polling/pollView"
             options={{
               title: "Your Polls",
               headerBackVisible: false,
@@ -82,14 +79,14 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="settings"
+            name="components/settings"
             options={{
               title: "Settings",
               headerBackVisible: true,
             }}
           />
           <Stack.Screen
-            name="elections"
+            name="election/elections"
             options={{
               title: "Student Elections",
               headerBackVisible: false,
@@ -97,21 +94,21 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="electionDetail"
+            name="election/electionDetail"
             options={{
               title: "Election Details",
               headerBackVisible: true,
             }}
           />
           <Stack.Screen
-            name="createElection"
+            name="creation/electionCreator"
             options={{
               title: "Create Election",
               headerBackVisible: true,
             }}
           />
           <Stack.Screen
-            name="expiredPolls"
+            name="polling/expiredPolls"
             options={{
               title: "Expired Polls",
               headerBackVisible: true,

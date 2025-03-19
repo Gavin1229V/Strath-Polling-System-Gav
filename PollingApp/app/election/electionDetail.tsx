@@ -12,9 +12,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "./userDetails";
-import { SERVER_IP } from "./config";
-import styles from "../styles/styles";
+import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "../components/userDetails";
+import { SERVER_IP } from "../config";
+import styles from "../../styles/styles";
 
 interface Candidate {
   id: number;

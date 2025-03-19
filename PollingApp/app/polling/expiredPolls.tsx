@@ -15,14 +15,20 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import styles from "../styles/styles";
-import { fetchPolls, getSocket, processProfilePicture } from "./global";
-import { SERVER_IP } from "./config";
-import { Poll } from "./global";
-import { useAuth, useUserRole } from "./userDetails";
+import styles from "../../styles/styles";
+import { getSocket, processProfilePicture, Poll } from "../components/global";
+import { SERVER_IP } from "../config";
+import { useAuth, useUserRole } from "../components/userDetails";
 import { useRouter } from "expo-router";
 import { VictoryPie } from "victory-native/lib/components/victory-pie";
-import { VotersList } from "./pollView"; // Reusing the VotersList component
+import {
+
+  PollPieChart, 
+  PollInfoOverlay,
+  TotalVotesIndicator,
+  PollListHeader,
+  chartColors
+} from "../components/pollVisualisation";
 
 const localStyles = StyleSheet.create({
   legendContainer: {
@@ -72,7 +78,7 @@ const ExpiredPollsScreen = () => {
     // Only student representatives (role 2) and lecturers (role 3) can access
     if (user && userRole !== undefined && (userRole < 2 || userRole > 3)) {
       // Redirect unauthorized users back to home
-      router.replace("/");
+      router.replace("/components/home");
     }
   }, [user, userRole, router]);
 
@@ -88,70 +94,57 @@ const ExpiredPollsScreen = () => {
     }
   };
 
-  // Fetch all polls and filter for expired ones
+  // Fetch expired polls from the new endpoint instead of filtering from all polls
   const fetchExpiredPolls = async () => {
     try {
       setLoading(true);
       
-      // Fetch all polls
-      await fetchPolls((allPolls) => {
-        // Filter for expired polls only
-        const now = new Date();
-        const expired = allPolls.filter(poll => {
-          if (!poll.expiry) return false;
-          
-          // Safely parse the expiry date
-          try {
-            const expiryDate = new Date(
-              poll.expiry.replace ? poll.expiry.replace(" ", "T") : poll.expiry
-            );
-            return expiryDate < now;
-          } catch (e) {
-            console.error("Invalid expiry date format:", poll.expiry);
-            return false;
-          }
-        });
-        
-        // For student reps, only show polls for their year group or their classes
-        if (userRole === 2 && user) {
-          const userClasses = user.classes ? user.classes.split(',').map(c => c.trim().toLowerCase()) : [];
-          
-          fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
-            .then(res => res.json())
-            .then(details => {
-              if (details && details.length > 0) {
-                const account = details[0];
-                const userYearGroup = account.year_group;
-                
-                // Filter polls based on year group or class
-                const filteredForRep = expired.filter(poll => 
-                  (poll.year_group && poll.year_group === userYearGroup) || 
-                  (poll.pollClass && userClasses.includes(poll.pollClass.toLowerCase()))
-                );
-                
-                setPolls(expired); // Keep all expired polls in state
-                setFilteredPolls(filteredForRep); // But display only filtered ones
-              } else {
-                setPolls(expired);
-                setFilteredPolls(expired);
-              }
-            })
-            .catch(err => {
-              console.error("Error fetching account details:", err);
-              setPolls(expired);
-              setFilteredPolls(expired);
-            })
-            .finally(() => {
-              setLoading(false);
-            });
-        } else {
-          // Lecturers see all expired polls
-          setPolls(expired);
-          setFilteredPolls(expired);
-          setLoading(false);
-        }
-      }, true); // Force refresh from server
+      // Fetch directly from the expired polls endpoint
+      const response = await fetch(`${SERVER_IP}/api/polls/expired`);
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
       
+      const expiredPolls = await response.json();
+      
+      // For student reps, filter based on year group or classes
+      if (userRole === 2 && user) {
+        const userClasses = user.classes ? user.classes.split(',').map(c => c.trim().toLowerCase()) : [];
+        
+        fetch(`${SERVER_IP}/accountDetails?userId=${user.user_id}`)
+          .then(res => res.json())
+          .then(details => {
+            if (details && details.length > 0) {
+              const account = details[0];
+              const userYearGroup = account.year_group;
+              
+              // Add explicit Poll type to the filter parameter
+              const filteredForRep = expiredPolls.filter((poll: Poll) => 
+                (poll.year_group && poll.year_group === userYearGroup) || 
+                (poll.pollClass && userClasses.includes(poll.pollClass.toLowerCase()))
+              );
+              
+              setPolls(expiredPolls); // Keep all expired polls in state
+              setFilteredPolls(filteredForRep); // But display only filtered ones
+            } else {
+              setPolls(expiredPolls);
+              setFilteredPolls(expiredPolls);
+            }
+          })
+          .catch(err => {
+            console.error("Error fetching account details:", err);
+            setPolls(expiredPolls);
+            setFilteredPolls(expiredPolls);
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      } else {
+        // Lecturers see all expired polls
+        setPolls(expiredPolls);
+        setFilteredPolls(expiredPolls);
+        setLoading(false);
+      }
     } catch (error) {
       console.error("Error fetching expired polls:", error);
       setLoading(false);
@@ -391,30 +384,15 @@ const ExpiredPollsScreen = () => {
     
     return (
       <View style={[styles.pollCard, isMobile && { marginHorizontal: 5, padding: 10 }]}>
-        {renderPieChart(item)}
+        <PollPieChart 
+          poll={item} 
+          openInfoOverlay={openInfoOverlay} 
+          isMobile={isMobile}
+          showExpiryBadge={true}
+        />
         
         {/* Total votes indicator */}
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'center',
-          alignItems: 'center',
-          paddingVertical: 8,
-          marginTop: 5,
-          marginBottom: 10,
-          backgroundColor: '#f5f5f5',
-          borderRadius: 20,
-          paddingHorizontal: 15,
-          alignSelf: 'center'
-        }}>
-          <Ionicons name="stats-chart" size={16} color="#555" style={{ marginRight: 6 }} />
-          <Text style={{ 
-            fontSize: 14, 
-            fontWeight: '600', 
-            color: '#555' 
-          }}>
-            {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'} total
-          </Text>
-        </View>
+        <TotalVotesIndicator totalVotes={totalVotes} />
       </View>
     );
   };
@@ -446,27 +424,13 @@ const ExpiredPollsScreen = () => {
           />
         }
         ListHeaderComponent={
-          <View style={{
-            padding: 16,
-            backgroundColor: '#f8f9fa',
-            borderRadius: 12,
-            margin: 16,
-            marginBottom: 20,
-          }}>
-            <Text style={{ 
-              fontSize: 20, 
-              fontWeight: '700',
-              color: '#333',
-              marginBottom: 8 
-            }}>
-              <Ionicons name="time" size={20} color="#555" /> Expired Polls
-            </Text>
-            <Text style={{ color: '#555' }}>
-              {userRole === 2 
-                ? "View the results of expired polls for your year group and classes."
-                : "Review all expired polls and their results."}
-            </Text>
-          </View>
+          <PollListHeader
+            title="Expired Polls"
+            description={userRole === 2 
+              ? "View the results of expired polls for your year group and classes."
+              : "Review all expired polls and their results."}
+            icon="time"
+          />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -483,146 +447,11 @@ const ExpiredPollsScreen = () => {
 
       {/* Info overlay */}
       {infoPoll && (
-        <Animated.View
-          style={[
-            styles.infoOverlay,
-            {
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          <View style={styles.infoCard}>
-            <TouchableOpacity
-              onPress={closeInfoOverlay}
-              style={styles.closeButton}
-            >
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
-            
-            {/* Profile picture using shared function */}
-            {infoPoll.profile_picture ? (
-              <Image
-                source={{
-                  uri: processProfilePicture(infoPoll.profile_picture) || undefined
-                }}
-                style={[styles.infoProfilePic, { marginTop: 10, width: 90, height: 90, borderRadius: 50 }]}
-              />
-            ) : null}
-            <Text style={styles.infoTitle}>Poll Info</Text>
-            
-            {/* Expired Badge */}
-            <View style={{
-              backgroundColor: '#ffcdd2', 
-              padding: 8, 
-              borderRadius: 8, 
-              marginVertical: 8,
-              flexDirection: 'row',
-              alignItems: 'center',
-              alignSelf: 'center'
-            }}>
-              <Ionicons name="time" size={16} color="#c62828" style={{ marginRight: 6 }} />
-              <Text style={{ color: '#c62828', fontWeight: '600' }}>
-                Expired Poll
-              </Text>
-            </View>
-            
-            {/* Add Year Group indicator for global polls */}
-            {infoPoll.year_group !== null && infoPoll.year_group !== undefined ? (
-              <View style={{
-                backgroundColor: '#e3f2fd', 
-                padding: 8, 
-                borderRadius: 8, 
-                marginVertical: 8,
-                alignSelf: 'center'
-              }}>
-                <Text style={{ color: '#1976d2', fontWeight: '600' }}>
-                  Year {infoPoll.year_group} Group Poll
-                </Text>
-              </View>
-            ) : null}
-            
-            <Text style={styles.infoDetail}>
-              Created on:{" "}
-              {new Date(infoPoll.created_at.replace(" ", "T")).toLocaleString()}
-            </Text>
-            <Text style={styles.infoDetail}>
-              Created by: {infoPoll.created_by}
-            </Text>
-            <Text style={styles.infoDetail}>
-              Expired on:{" "}
-              {infoPoll.expiry
-                ? new Date(infoPoll.expiry.replace(" ", "T")).toLocaleString()
-                : "N/A"}
-            </Text>
-            
-            {/* Vote statistics section */}
-            <View style={{ marginTop: 15, width: '100%' }}>
-              <Text style={[styles.infoTitle, { fontSize: 18, marginBottom: 10 }]}>
-                Vote Statistics
-              </Text>
-              
-              {infoPoll.options.length > 0 ? (
-                <>
-                  {/* Total votes count */}
-                  <Text style={[styles.infoDetail, { fontWeight: '500', marginBottom: 8 }]}>
-                    Total votes: {infoPoll.options.reduce((sum, opt) => sum + opt.votes, 0)}
-                  </Text>
-                  
-                  {/* Vote percentage breakdown */}
-                  {(() => {
-                    const totalVotes = infoPoll.options.reduce((sum, opt) => sum + opt.votes, 0);
-                    
-                    return infoPoll.options.map((option, index) => {
-                      const percentage = totalVotes > 0 
-                        ? Math.round((option.votes / totalVotes) * 100) 
-                        : 0;
-                        
-                      return (
-                        <View key={option.id} style={{
-                          flexDirection: 'column',
-                          marginBottom: 10,
-                          paddingVertical: 4,
-                          borderBottomWidth: index < infoPoll.options.length - 1 ? 1 : 0,
-                          borderBottomColor: '#eee'
-                        }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                            <View style={[
-                              styles.swatchBox, 
-                              { backgroundColor: chartColors[index % chartColors.length] }
-                            ]} />
-                            <Text style={{ fontWeight: '500', marginLeft: 8, flex: 1 }} numberOfLines={2}>
-                              {option.text}
-                            </Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 4 }}>
-                            <View style={{
-                              height: 6,
-                              backgroundColor: chartColors[index % chartColors.length],
-                              width: `${percentage}%`,
-                              maxWidth: '60%',
-                              borderRadius: 3,
-                              marginRight: 8
-                            }} />
-                            <Text style={{ fontSize: 13, color: '#555' }}>
-                              {option.votes} vote{option.votes !== 1 ? 's' : ''} ({percentage}%)
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    });
-                  })()}
-                </>
-              ) : (
-                <Text style={{ color: '#666', fontStyle: 'italic' }}>
-                  No voting options available
-                </Text>
-              )}
-            </View>
-            
-            {/* Voters section - using the voters list component */}
-            {infoPoll && <VotersList pollId={infoPoll.id} poll={infoPoll} />}
-          </View>
-        </Animated.View>
+        <PollInfoOverlay
+          poll={infoPoll}
+          slideAnim={slideAnim}
+          closeInfoOverlay={closeInfoOverlay}
+        />
       )}
     </View>
   );

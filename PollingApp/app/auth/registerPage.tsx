@@ -11,15 +11,14 @@ import {
   Animated,    // 1) Import Animated
   Easing,
 } from "react-native";
-import * as Updates from "expo-updates"; // Import expo-updates
 
 import { useRouter } from "expo-router";
-import { SERVER_IP } from "./config";
-import { useAuth } from "./userDetails";
+import { SERVER_IP } from "../config";
+import { useAuth } from "../components/userDetails";
 import { Asset } from "expo-asset";
-import authStyles from "../styles/authStyles";
+import authStyles from "../../styles/authStyles";
 
-const bgImage = require("../assets/images/StrathBG_Index.jpg");
+const bgImage = require("../../assets/images/StrathBG_Index.jpg");
 
 const computeEntropy = (pwd: string): number => {
   let pool = 0;
@@ -110,7 +109,7 @@ const RegisterPage: React.FC = () => {
         const data = await response.json();
         const token = data.token;
         Alert.alert("Success", "Registered successfully.");
-        router.replace("/"); // Navigate back to the index page
+        router.replace("../auth/index"); // Navigate back to the index page
       } else {
         const errorData = await response.json();
         Alert.alert("Error", errorData.message || "Registration failed.");
@@ -255,7 +254,7 @@ const RegisterPage: React.FC = () => {
               <Text style={authStyles.buttonText}>Register</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => router.replace("/login")}>
+          <TouchableOpacity onPress={() => router.replace("./login")}>
             <Text style={authStyles.switchText}>Already have an account? Login</Text>
           </TouchableOpacity>
         </View>

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { SafeAreaView, View, Text, TextInput, TouchableOpacity, ImageBackground, Alert, Dimensions, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { useRouter } from "expo-router";
-import { SERVER_IP } from "./config";
-import { useAuth } from "./userDetails";
+import { SERVER_IP } from "../config";
+import { useAuth } from "../components/userDetails";
 import { Asset } from "expo-asset";
-import authStyles from "../styles/authStyles";
-const bgImage = require("../assets/images/StrathBG_Index.jpg");
+import authStyles from "../../styles/authStyles";
+const bgImage = require("../../assets/images/StrathBG_Index.jpg");
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -53,7 +53,7 @@ const LoginPage: React.FC = () => {
         console.log("User details:", data);
         Alert.alert("Success", "Logged in successfully.");
         // Redirect to home.tsx after successful login
-        router.replace("/home");
+        router.replace("/components/home");
       } else {
         const errorData = await response.json();
         Alert.alert("Error", errorData.message || "Invalid email or password.");

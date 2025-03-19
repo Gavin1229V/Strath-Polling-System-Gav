@@ -32,7 +32,7 @@ const StartPage = () => {
           <Text style={authStyles.title}>Welcome to Simpoll!</Text>
           
           {/* Navigation buttons */}
-          {['login', 'registerPage'].map((route, i) => (
+          {['./auth/login', './auth/registerPage'].map((route, i) => (
             <TouchableOpacity 
               key={route}
               style={authStyles.button} 

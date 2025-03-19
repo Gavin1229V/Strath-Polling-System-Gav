@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from "react-native";
 import { useAuth } from "./userDetails";
 import { useRouter } from "expo-router";
-import { SERVER_IP } from "./config";
+import { SERVER_IP } from "../config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import globalStyles from "../styles/styles"; // Import global styles
+import globalStyles from "../../styles/styles"; // Import global styles
 
 // Hardcoded mapping for each year
 const yearClassMapping: Record<string, string[]> = {
@@ -141,7 +141,7 @@ const ClassChooser = () => {
         await AsyncStorage.removeItem("user");
         setUser({ ...user, classes: classesString });
         Alert.alert("Success", result.message || "Classes saved successfully.", [
-          { text: "OK", onPress: () => router.replace("/home") }
+          { text: "OK", onPress: () => router.replace("/components/home") }
         ]);
       } else {
         Alert.alert("Error", result.message || "Failed to save classes.");
