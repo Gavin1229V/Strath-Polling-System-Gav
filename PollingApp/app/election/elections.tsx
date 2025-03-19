@@ -10,7 +10,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+<<<<<<< HEAD
 import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "../components/userDetails";
+=======
+import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "../userDetails";
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
 import { SERVER_IP } from "../config";
 import styles from "../../styles/styles";
 
@@ -97,12 +101,20 @@ const ElectionsScreen = () => {
 
   // Navigate to election details
   const viewElection = (election: Election) => {
+<<<<<<< HEAD
     router.push(`./electionDetail?id=${election.id}`);
+=======
+    router.push(`/election/electionDetail?id=${election.id}`);
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
   };
 
   // Create a new election
   const createElection = () => {
+<<<<<<< HEAD
     router.push("./createElection");
+=======
+    router.push("/election/createElection");
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
   };
 
   if (loading) {
@@ -175,6 +187,7 @@ const ElectionsScreen = () => {
         contentContainerStyle={{ paddingTop: 0 }}
       >
         {filteredElections.length > 0 ? (
+<<<<<<< HEAD
           <>
             {/* Active Elections */}
             {filteredElections.some(election => !election.is_expired) && (
@@ -326,6 +339,77 @@ const ElectionsScreen = () => {
               </View>
             )}
           </>
+=======
+          filteredElections.map((election) => (
+            <TouchableOpacity
+              key={election.id}
+              style={[
+                styles.electionCard,
+                election.is_expired && election.winner_id ? { 
+                  borderLeftWidth: 4, 
+                  borderLeftColor: '#4CAF50' 
+                } : undefined
+              ]}
+              onPress={() => viewElection(election)}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.electionTitle}>{election.title}</Text>
+                <View style={{ 
+                  backgroundColor: '#E3F2FD', 
+                  paddingVertical: 4, 
+                  paddingHorizontal: 10, 
+                  borderRadius: 12
+                }}>
+                  <Text style={{ color: '#1976D2', fontWeight: '600' }}>
+                    Year {election.year_group}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.electionDetail}>
+                <Ionicons name="calendar-outline" size={16} color="#666" style={{ marginRight: 6 }} />
+                <Text>{election.is_expired ? "Ended: " : "Ends: "}{formatDate(election.end_date)}</Text>
+              </View>
+              
+              {/* Show creator info using email parsing */}
+              {election.creator_email && (
+                <View style={styles.electionDetail}>
+                  <Ionicons name="person-outline" size={16} color="#666" style={{ marginRight: 6 }} />
+                  <Text>Created by: {getFirstNameFromEmail(election.creator_email)} {getLastNameFromEmail(election.creator_email)}</Text>
+                </View>
+              )}
+              
+              <View style={styles.electionMetaContainer}>
+                {!election.is_expired ? (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Ionicons name="people-outline" size={16} color="#666" style={{ marginRight: 4 }} />
+                    <Text style={{ color: "#666", fontSize: 13 }}>
+                      {election.candidate_count} candidate{election.candidate_count !== 1 ? "s" : ""}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Ionicons name="trophy-outline" size={16} color="#4CAF50" style={{ marginRight: 4 }} />
+                    <Text style={{ color: "#4CAF50", fontSize: 13, fontWeight: '600' }}>
+                      Winner Announced
+                    </Text>
+                  </View>
+                )}
+                
+                <Text
+                  style={[
+                    styles.electionStatus,
+                    !election.is_expired
+                      ? styles.electionStatusOpen
+                      : styles.electionStatusClosed,
+                  ]}
+                >
+                  {!election.is_expired ? "OPEN" : "COMPLETED"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
         ) : (
           <View style={styles.emptyContainer}>
             <Ionicons name="information-circle-outline" size={40} color="#999" />

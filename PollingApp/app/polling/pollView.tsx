@@ -3,13 +3,23 @@ import {
   View,
   Text,
   FlatList,
+<<<<<<< HEAD
   Dimensions,
   TouchableOpacity,
+=======
+  Button,
+  Dimensions,
+  Image,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
   ActivityIndicator,
   Animated,
   useWindowDimensions,
   RefreshControl,
   Switch,
+<<<<<<< HEAD
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,6 +43,195 @@ import {
 
 // Export the VotersList for backward compatibility
 export { VotersList } from "../components/pollVisualisation";
+=======
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons"; // Make sure Ionicons is imported
+import styles from "../../styles/styles";
+import { fetchPolls, getSocket, processProfilePicture } from "../global";
+import { SERVER_IP } from "../config";
+import { Poll } from "../global";
+import { useUserClasses, useAuth } from "../userDetails";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { VictoryPie } from "victory-native/lib/components/victory-pie";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Add properly typed interfaces for our data
+interface VoterInfo {
+  user_id: number | string;
+  email?: string;  // Add this property to match the backend response
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  profile_picture?: string | null;
+  anonymous_index?: number;  // Add this property for anonymous participants
+  is_anonymous?: boolean;    // Add this property for anonymous voting check
+  displayId?: string;  // Add this property to fix the TypeScript error
+}
+
+// Update the VotersList component to display more user information
+export const VotersList = ({ pollId, poll }: { pollId: number, poll: Poll }) => {
+  const [voters, setVoters] = useState<VoterInfo[]>([]);
+  const [loadingVoters, setLoadingVoters] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!poll || !poll.options || poll.options.length === 0) return;
+    
+    const fetchVoters = async () => {
+      setLoadingVoters(true);
+      setError(null);
+      try {
+        // Create arrays to store all voter IDs and their anonymous status
+        let allVoterIds: string[] = [];
+        let anonymousFlags: {[key: string]: boolean} = {};
+        
+        // Step 1: Collect all voter IDs and their anonymous status from all options
+        poll.options.forEach(option => {
+          if (option.voters && option.anonymous) {
+            const voterIds = option.voters.split(',').filter(id => id && id.trim());
+            const anonFlags = option.anonymous.split(',').filter(flag => flag !== undefined);
+            
+            // Make sure the arrays are the same length
+            const minLength = Math.min(voterIds.length, anonFlags.length);
+            
+            for (let i = 0; i < minLength; i++) {
+              const voterId = voterIds[i];
+              const isAnon = anonFlags[i] === '1';
+              
+              allVoterIds.push(voterId);
+              anonymousFlags[voterId] = isAnon;
+            }
+          } else if (option.voters) {
+            // Handle case where anonymous flags are missing
+            const voterIds = option.voters.split(',').filter(id => id && id.trim());
+            voterIds.forEach(id => {
+              allVoterIds.push(id);
+              anonymousFlags[id] = false;  // Default to non-anonymous
+            });
+          }
+        });
+        
+        console.log(`[DEBUG] Poll ${pollId} - Collected ${allVoterIds.length} total votes`);
+        
+        if (allVoterIds.length === 0) {
+          setVoters([]);
+          return;
+        }
+        
+        // Step 2: Fetch user data for all voter IDs
+        const response = await fetch(`${SERVER_IP}/api/users/batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userIds: allVoterIds }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+        
+        const userData = await response.json();
+        const userMap: {[key: string]: VoterInfo} = {};
+        
+        // Map users by ID for easy lookup
+        userData.forEach((user: VoterInfo) => {
+          userMap[user.user_id.toString()] = user;
+        });
+        
+        // Step 3: Create the final voter list with anonymous flags
+        const finalVoters = allVoterIds.map((voterId, index) => {
+          const isAnonymous = anonymousFlags[voterId] || false;
+          const baseUser = userMap[voterId] || { user_id: voterId };
+          
+          return {
+            ...baseUser,
+            displayId: `${voterId}-${index}`, 
+            is_anonymous: isAnonymous
+          };
+        });
+        
+        console.log(`[DEBUG] Poll ${pollId} - Final participants: ${finalVoters.length}`);
+        setVoters(finalVoters);
+        
+      } catch (error) {
+        console.error("Error fetching voters:", error);
+        setError(error instanceof Error ? error.message : "Unknown error");
+        setVoters([]);
+      } finally {
+        setLoadingVoters(false);
+      }
+    };
+    
+    fetchVoters();
+  }, [poll, pollId]);
+
+  return (
+    <View style={{ marginTop: 20, width: '100%' }}>
+      <Text style={[styles.infoTitle, { fontSize: 18, marginBottom: 10 }]}>
+        Poll Participants ({voters.length})
+      </Text>
+      
+      {loadingVoters ? (
+        <ActivityIndicator size="small" color="#007AFF" style={{ marginVertical: 10 }} />
+      ) : error ? (
+        <Text style={{ color: 'red', fontStyle: 'italic', marginVertical: 10 }}>
+          {error}
+        </Text>
+      ) : voters.length > 0 ? (
+        <FlatList
+          data={voters}
+          keyExtractor={(item, index) => `voter-${item.displayId || index}`}
+          horizontal={false}
+          showsVerticalScrollIndicator={true}
+          style={{ maxHeight: 200 }}
+          contentContainerStyle={{ paddingBottom: 10 }}
+          renderItem={({ item }) => (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 6,
+              borderBottomWidth: 1,
+              borderBottomColor: '#eee'
+            }}>
+              <Image
+                source={{
+                  uri: item.is_anonymous
+                    ? 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
+                    : processProfilePicture(item.profile_picture || null) || 
+                      'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
+                }}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  marginRight: 10
+                }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '500' }}>
+                  {item.is_anonymous
+                    ? "Anonymous Participant" 
+                    : (item.first_name && item.last_name 
+                        ? `${item.first_name} ${item.last_name}` 
+                        : (item.email || `User ${item.user_id}`))}
+                </Text>
+                {!item.is_anonymous && item.email && (
+                  <Text style={{ fontSize: 12, color: '#666' }}>
+                    {item.email}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+        />
+      ) : (
+        <Text style={{ color: '#666', fontStyle: 'italic' }}>
+          No participant data found
+        </Text>
+      )}
+    </View>
+  );
+};
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
 
 const PollView = () => {
   const { activeFilter: initialFilter } = useLocalSearchParams<{ activeFilter?: string }>();
@@ -74,6 +273,10 @@ const PollView = () => {
       await fetchPolls(setPolls, true); // Force refresh
     } catch (error) {
       console.error("Error refreshing polls:", error);
+<<<<<<< HEAD
+=======
+      // You could add a toast message here for user feedback
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
     } finally {
       setRefreshing(false);
     }
@@ -275,6 +478,26 @@ const PollView = () => {
     }
   }, [initialFilter, normalizedCurrentClasses]);
 
+<<<<<<< HEAD
+=======
+  // Helper function to check if a poll is expired
+  const isPollExpired = (poll: Poll): boolean => {
+    if (!poll.expiry) return false;
+    
+    try {
+      const now = new Date();
+      // Handle both formats of date strings
+      const expiryDate = new Date(
+        poll.expiry.replace ? poll.expiry.replace(" ", "T") : poll.expiry
+      );
+      return expiryDate <= now;
+    } catch (e) {
+      console.error("Invalid expiry date format:", poll.expiry);
+      return false;
+    }
+  };
+
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
   // Loading state
   if (loading) {
     return (
@@ -353,13 +576,32 @@ const PollView = () => {
     setTimeout(() => setVoteLoading(false), 2000);
   };
 
+<<<<<<< HEAD
+=======
+  // Pie chart colors with names
+  const chartColors = [
+    "#FF6384", // Red
+    "#36A2EB", // Blue
+    "#FFCE56", // Yellow
+    "#4BC0C0", // Teal
+    "#9966FF", // Purple
+    "#FF9F40", // Orange
+    "#FFCD56", // Gold
+    "#C9CBCF", // Grey
+  ];
+
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
   // Info overlay open
   const openInfoOverlay = (poll: Poll) => {
     setInfoPoll(poll);
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 300,
+<<<<<<< HEAD
       useNativeDriver: false,
+=======
+      useNativeDriver: false,  // Changed from true to false
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
     }).start();
   };
 
@@ -368,12 +610,145 @@ const PollView = () => {
     Animated.timing(slideAnim, {
       toValue: -300,
       duration: 300,
+<<<<<<< HEAD
       useNativeDriver: false,
+=======
+      useNativeDriver: false,  // Changed from true to false
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
     }).start(() => {
       setInfoPoll(null);
     });
   };
 
+<<<<<<< HEAD
+=======
+  // Render the pie chart and poll details
+  const renderPieChart = (poll: Poll) => {
+    const pollClass = poll.pollClass || (poll as any)["class"] || "";
+    const isYearGroupPoll = poll.global && poll.year_group;
+
+    // Use the shared profile picture processing function
+    let profilePicUrl = processProfilePicture(poll.profile_picture);
+
+    // Transform data for VictoryPie
+    const data = poll.options.map((option, index) => ({
+      x: option.text,
+      y: option.votes || 0.001, // Avoid zero values which can cause rendering issues
+      color: chartColors[index % chartColors.length],
+    }));
+
+    // Skip rendering chart if all votes are 0
+    const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
+
+    // Increase chart size while keeping it responsive
+    const chartWidth = Math.min(380, screenWidth - 40);
+    const chartHeight = Math.min(280, chartWidth * 0.8);
+
+    // Platform-specific label styles to avoid web warnings
+    const labelStyles = Platform.select({
+      web: {
+        fill: "#000", // Changed from "#fff" to black
+        fontSize: 14,
+        fontWeight: "bold",
+      },
+      default: {
+        fill: "#000", // Changed from "#fff" to black
+        fontSize: 14,
+        fontWeight: "bold",
+        textShadow: "1px 1px 2px rgba(255,255,255,0.7)" // Modified shadow for better contrast
+      }
+    });
+
+    return (
+      <View style={{ marginVertical: 10, position: "relative" }}>
+        {/* Info button top-right */}
+        <TouchableOpacity
+          onPress={() => openInfoOverlay(poll)}
+          style={{
+            position: "absolute",
+            top: 5,
+            right: 5,
+            backgroundColor: "#007AFF",
+            width: 30,
+            height: 30,
+            borderRadius: 15,
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1,
+          }}
+        >
+          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>i</Text>
+        </TouchableOpacity>
+
+        {/* Year Group indicator or Class code */}
+        {isYearGroupPoll ? (
+          <View style={{
+            backgroundColor: '#e3f2fd',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 16,
+            alignSelf: 'flex-start',
+            marginBottom: 6,
+            borderWidth: 1,
+            borderColor: '#bbdefb',
+            flexDirection: 'row',
+            alignItems: 'center'
+          }}>
+            <Ionicons name="people" size={14} color="#1976d2" style={{ marginRight: 4 }} />
+            <Text style={{ 
+              color: '#1976d2',
+              fontWeight: '600',
+              fontSize: 13,
+            }}>Year {poll.year_group}</Text>
+          </View>
+        ) : pollClass ? (
+          <Text style={styles.classCode}>{pollClass}</Text>
+        ) : null}
+
+        {/* Question text */}
+        <Text style={styles.questionText}>{poll.question}</Text>
+
+        {/* Centered chart with increased size */}
+        <View style={{ alignItems: "center", alignSelf: "center", marginVertical: 15 }}>
+          {totalVotes > 0 ? (
+            <VictoryPie
+              data={data}
+              width={chartWidth}
+              height={chartHeight}
+              padding={50}
+              innerRadius={chartWidth * 0.12}
+              style={{
+                data: { 
+                  fill: ({ datum }) => datum.color,
+                  stroke: "#fff",
+                  strokeWidth: 1
+                },
+                labels: labelStyles
+              }}
+              animate={{
+                duration: 2000,
+                easing: "bounce",
+                onLoad: { duration: 1000 }
+              }}
+              labelPlacement="parallel"
+              labels={({ datum }) => 
+                totalVotes > 0 && datum.y/totalVotes > 0.05 ? 
+                  `${Math.round((datum.y/totalVotes)*100)}%` : ""
+              }
+            />
+          ) : (
+            <Text style={{ fontSize: 16, color: "#666", padding: 20 }}>
+              No votes yet
+            </Text>
+          )}
+          
+          {/* Removed custom legend section - poll options will only be displayed once with the vote buttons */}
+        </View>
+      </View>
+    );
+  };
+
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
   // Render each poll card with anonymous vote check
   const renderPoll = ({ item }: { item: Poll }) => {
     // Check if user has voted in this poll (either normally or anonymously)
@@ -390,6 +765,7 @@ const PollView = () => {
     
     return (
       <View style={[styles.pollCard, isMobile && { marginHorizontal: 5, padding: 10 }]}>
+<<<<<<< HEAD
         {/* Use the shared PollPieChart component */}
         <PollPieChart 
           poll={item} 
@@ -399,6 +775,32 @@ const PollView = () => {
         
         {/* Total votes indicator */}
         <TotalVotesIndicator totalVotes={totalVotes} />
+=======
+        {renderPieChart(item)}
+        
+        {/* Total votes indicator */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingVertical: 8,
+          marginTop: 5,
+          marginBottom: 10,
+          backgroundColor: '#f5f5f5',
+          borderRadius: 20,
+          paddingHorizontal: 15,
+          alignSelf: 'center'
+        }}>
+          <Ionicons name="stats-chart" size={16} color="#555" style={{ marginRight: 6 }} />
+          <Text style={{ 
+            fontSize: 14, 
+            fontWeight: '600', 
+            color: '#555' 
+          }}>
+            {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'} total
+          </Text>
+        </View>
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
         
         <View style={[
           styles.voteOptionsContainer,
@@ -421,7 +823,11 @@ const PollView = () => {
                   marginBottom: isMobile ? 0 : 4,
                   flex: isMobile ? 1 : undefined 
                 }}>
+<<<<<<< HEAD
                   <View style={[styles.swatchBox, { backgroundColor: index % 8 === 0 ? "#FF6384" : index % 8 === 1 ? "#36A2EB" : index % 8 === 2 ? "#FFCE56" : index % 8 === 3 ? "#4BC0C0" : index % 8 === 4 ? "#9966FF" : index % 8 === 5 ? "#FF9F40" : index % 8 === 6 ? "#FFCD56" : "#C9CBCF" }]} />
+=======
+                  <View style={[styles.swatchBox, { backgroundColor: chartColors[index % chartColors.length] }]} />
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
                   <Text style={[styles.swatchText, isMobile && { flex: 1, marginRight: 8, flexWrap: 'wrap' }]} numberOfLines={2}>
                     {option.text}
                   </Text>
@@ -467,6 +873,60 @@ const PollView = () => {
       : pollClassNormalized === activeFilter.trim().toLowerCase();
   });
 
+<<<<<<< HEAD
+=======
+  // Helper function to format expiry dates
+  const formatExpiry = (expiry: string) => {
+    if (!expiry) return "N/A";
+    const validStr = expiry.includes("T") ? expiry : expiry.replace(" ", "T");
+    const dateObj = new Date(validStr);
+    if (isNaN(dateObj.getTime())) return "Invalid date";
+    return `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  };
+
+  // Add this helper function to extract voters from poll options
+  const getUniqueVotersFromPoll = (poll: Poll): string[] => {
+    if (!poll || !poll.options) return [];
+    
+    // For regular users, we want to deduplicate
+    const regularVoterIds = new Set<string>();
+    // For anonymous users (ID "1"), we need to keep track of how many there are
+    let anonymousVoterCount = 0;
+    
+    // Count all voters across all options
+    poll.options.forEach(option => {
+      if (option.voters) {
+        const voterIds = option.voters.split(',').filter(id => id && id.trim());
+        voterIds.forEach(id => {
+          if (id === "1") {
+            anonymousVoterCount++;
+          } else {
+            regularVoterIds.add(id);
+          }
+        });
+      }
+    });
+    
+    // Build the final array with regular users first, then anonymous users
+    const result: string[] = [];
+    
+    // Add regular voter IDs (already deduplicated by the Set)
+    result.push(...Array.from(regularVoterIds));
+    
+    // Add all anonymous voter IDs (preserving duplicates) after regular users
+    for (let i = 0; i < anonymousVoterCount; i++) {
+      result.push("1");
+    }
+    
+    console.log(`[DEBUG] Poll ${poll.id} - getUniqueVotersFromPoll found ${regularVoterIds.size} unique regular users and ${anonymousVoterCount} anonymous voters`);
+    
+    return result;
+  };
+
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
   return (
     <View style={styles.container}>
       <FlatList
@@ -486,6 +946,7 @@ const PollView = () => {
         ListHeaderComponent={
           <View>
             {/* Anonymous Mode Toggle */}
+<<<<<<< HEAD
             <AnonymousModeToggle 
               anonymousMode={anonymousMode} 
               toggleAnonymousMode={toggleAnonymousMode} 
@@ -498,6 +959,77 @@ const PollView = () => {
               currentClasses={currentClasses}
               isMobile={isMobile}
             />
+=======
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              alignItems: 'center',
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              marginTop: 5
+            }}>
+              <Text style={{ marginRight: 10, fontSize: 14, fontWeight: '500' }}>
+                Anonymous Mode
+              </Text>
+              <Switch
+                trackColor={{ false: "#767577", true: "#81b0ff" }}
+                thumbColor={anonymousMode ? "#007AFF" : "#f4f3f4"}
+                ios_backgroundColor="#3e3e3e"
+                onValueChange={toggleAnonymousMode}
+                value={anonymousMode}
+              />
+            </View>
+            
+            {/* Class Filter */}
+            <View style={{
+              marginBottom: 10,
+              backgroundColor: '#F2F4F8',
+              borderRadius: 12,
+              paddingVertical: 10,
+              marginHorizontal: isMobile ? 5 : 16,
+              marginTop: 5
+            }}>
+              <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#555' }}>
+                  <Ionicons name="filter-outline" size={16} color="#555" /> Filter by Class:
+                </Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 12 }}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.yearFilterChip,
+                    activeFilter === "All" && styles.yearFilterChipActive,
+                  ]}
+                  onPress={() => setActiveFilter("All")}
+                >
+                  <Text style={[
+                    styles.yearFilterChipText,
+                    activeFilter === "All" && styles.yearFilterChipTextActive
+                  ]}>All Polls</Text>
+                </TouchableOpacity>
+                
+                {currentClasses.map((cls) => (
+                  <TouchableOpacity
+                    key={cls}
+                    style={[
+                      styles.yearFilterChip,
+                      activeFilter === cls && styles.yearFilterChipActive,
+                    ]}
+                    onPress={() => setActiveFilter(cls)}
+                  >
+                    <Text style={[
+                      styles.yearFilterChipText,
+                      activeFilter === cls && styles.yearFilterChipTextActive
+                    ]}>{cls}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
           </View>
         }
         ListEmptyComponent={
@@ -516,6 +1048,7 @@ const PollView = () => {
         </View>
       )}
 
+<<<<<<< HEAD
       {/* Use the shared PollInfoOverlay component */}
       {infoPoll && (
         <PollInfoOverlay 
@@ -523,6 +1056,139 @@ const PollView = () => {
           slideAnim={slideAnim} 
           closeInfoOverlay={closeInfoOverlay} 
         />
+=======
+      {/* Info overlay */}
+      {infoPoll && (
+        <Animated.View
+          style={[
+            styles.infoOverlay,
+            {
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.infoCard}>
+            <TouchableOpacity
+              onPress={closeInfoOverlay}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeButtonText}>×</Text>
+            </TouchableOpacity>
+            
+            {/* Profile picture using shared function */}
+            {infoPoll.profile_picture ? (
+              <Image
+                source={{
+                  uri: processProfilePicture(infoPoll.profile_picture) || undefined
+                }}
+                style={[styles.infoProfilePic, { marginTop: 10, width: 90, height: 90, borderRadius: 50 }]}
+              />
+            ) : null}
+            <Text style={styles.infoTitle}>Poll Info</Text>
+            
+            {/* Add Year Group indicator for global polls */}
+            {infoPoll.global && infoPoll.year_group ? (
+              <View style={{
+                backgroundColor: '#e3f2fd', 
+                padding: 8, 
+                borderRadius: 8, 
+                marginVertical: 8,
+                alignSelf: 'center'
+              }}>
+                <Text style={{ color: '#1976d2', fontWeight: '600' }}>
+                  Year {infoPoll.year_group} Group Poll
+                </Text>
+              </View>
+            ) : null}
+            
+            <Text style={styles.infoDetail}>
+              Created on:{" "}
+              {new Date(infoPoll.created_at.replace(" ", "T")).toLocaleString()}
+            </Text>
+            <Text style={styles.infoDetail}>
+              Created by: {infoPoll.created_by}
+            </Text>
+            <Text style={styles.infoDetail}>
+              Expires at:{" "}
+              {infoPoll.expiry
+                ? new Date(infoPoll.expiry.replace(" ", "T")).toLocaleString()
+                : "N/A"}
+            </Text>
+            
+            {/* Vote statistics section */}
+            <View style={{ marginTop: 15, width: '100%' }}>
+              <Text style={[styles.infoTitle, { fontSize: 18, marginBottom: 10 }]}>
+                Vote Statistics
+              </Text>
+              
+              {infoPoll.options.length > 0 ? (
+                <>
+                  {/* Total votes count */}
+                  <Text style={[styles.infoDetail, { fontWeight: '500', marginBottom: 8 }]}>
+                    Total votes: {infoPoll.options.reduce((sum, opt) => sum + opt.votes, 0)}
+                  </Text>
+                  
+                  {/* Vote percentage breakdown */}
+                  {(() => {
+                    const totalVotes = infoPoll.options.reduce((sum, opt) => sum + opt.votes, 0);
+                    
+                    return infoPoll.options.map((option, index) => {
+                      const percentage = totalVotes > 0 
+                        ? Math.round((option.votes / totalVotes) * 100) 
+                        : 0;
+                        
+                      return (
+                        <View key={option.id} style={{
+                          flexDirection: 'column',
+                          marginBottom: 10,
+                          paddingVertical: 4,
+                          borderBottomWidth: index < infoPoll.options.length - 1 ? 1 : 0,
+                          borderBottomColor: '#eee'
+                        }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            <View style={[
+                              styles.swatchBox, 
+                              { backgroundColor: chartColors[index % chartColors.length] }
+                            ]} />
+                            <Text style={{ fontWeight: '500', marginLeft: 8, flex: 1 }} numberOfLines={2}>
+                              {option.text}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 4 }}>
+                            <View style={{
+                              height: 6,
+                              backgroundColor: chartColors[index % chartColors.length],
+                              width: `${percentage}%`,
+                              maxWidth: '60%',
+                              borderRadius: 3,
+                              marginRight: 8
+                            }} />
+                            <Text style={{ fontSize: 13, color: '#555' }}>
+                              {option.votes} vote{option.votes !== 1 ? 's' : ''} ({percentage}%)
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    });
+                  })()}
+                </>
+              ) : (
+                <Text style={{ color: '#666', fontStyle: 'italic' }}>
+                  No voting options available
+                </Text>
+              )}
+            </View>
+            
+            {/* Voters section - using the dedicated component */}
+            {infoPoll && 
+              <VotersList 
+                pollId={infoPoll.id}
+                poll={infoPoll}
+              />
+            }
+          </View>
+        </Animated.View>
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
       )}
     </View>
   );

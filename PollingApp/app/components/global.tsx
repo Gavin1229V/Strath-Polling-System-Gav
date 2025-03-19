@@ -313,16 +313,4 @@ export const convertToBase64Uri = (pic: any): string => {
   return "";
 };
 
-// Update the VoterInfo interface
-interface VoterInfo {
-  user_id: number | string;
-  email?: string;
-  username?: string;
-  first_name?: string;
-  last_name?: string;
-  profile_picture?: string | null;
-  is_anonymous?: boolean;
-  displayId?: string;
-}
-
 export default{}

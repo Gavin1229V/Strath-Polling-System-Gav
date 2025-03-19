@@ -16,6 +16,7 @@ function InnerLayout() {
     }
   }, [user, pathname]);
 
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -63,7 +64,7 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="creation/pollCreator"
+            name="pollCreator"
             options={{
               title: "Poll Creation",
               headerBackVisible: false,
@@ -101,7 +102,7 @@ function InnerLayout() {
             }}
           />
           <Stack.Screen
-            name="creation/electionCreator"
+            name="createElection"
             options={{
               title: "Create Election",
               headerBackVisible: true,

@@ -420,7 +420,11 @@ const HomeScreen = () => {
                 </View>
                 
                 <TouchableOpacity
+<<<<<<< HEAD:PollingApp/app/components/home.tsx
                   onPress={() => router.push("../creation/electionCreator")}
+=======
+                  onPress={() => router.push("/election/createElection")}
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c:PollingApp/app/home.tsx
                   style={{
                     backgroundColor: "#4CAF50",
                     padding: 12,

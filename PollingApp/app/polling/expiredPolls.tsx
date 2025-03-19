@@ -16,9 +16,16 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import styles from "../../styles/styles";
+<<<<<<< HEAD
 import { getSocket, processProfilePicture, Poll } from "../components/global";
 import { SERVER_IP } from "../config";
 import { useAuth, useUserRole } from "../components/userDetails";
+=======
+import { fetchPolls, getSocket, processProfilePicture } from "../global";
+import { SERVER_IP } from "../config";
+import { Poll } from "../global";
+import { useAuth, useUserRole } from "../userDetails";
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
 import { useRouter } from "expo-router";
 import { VictoryPie } from "victory-native/lib/components/victory-pie";
 import {

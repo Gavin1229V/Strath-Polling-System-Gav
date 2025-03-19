@@ -12,7 +12,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+<<<<<<< HEAD
 import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "../components/userDetails";
+=======
+import { useAuth, getFirstNameFromEmail, getLastNameFromEmail } from "../userDetails";
+>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c
 import { SERVER_IP } from "../config";
 import styles from "../../styles/styles";
 
