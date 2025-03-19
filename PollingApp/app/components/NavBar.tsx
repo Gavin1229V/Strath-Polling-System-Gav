@@ -23,14 +23,7 @@ const NavBar = () => {
   // Check if user is a lecturer (role === 3)
   const isLecturer = userRole === 3;
   
-<<<<<<< HEAD:PollingApp/app/components/NavBar.tsx
-  // Check if user is an instructor (specifically role === 3)
-  const isInstructor = userRole === 3;
-  
-  // Update path checks to match the file structure
-=======
   // Updated isActive function to check if pathname includes the route segment
->>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c:PollingApp/components/NavBar.tsx
   const isActive = (route: string): boolean => pathname.includes(route);
 
   return (
@@ -53,27 +46,16 @@ const NavBar = () => {
         
         {(isLecturer || isStudentRep) && (
           <TouchableOpacity 
-<<<<<<< HEAD:PollingApp/app/components/NavBar.tsx
-            style={[styles.navButton, isActive("/creation/pollCreator") && styles.activeNavButton]} 
-            onPress={() => router.replace("/creation/pollCreator")}
-=======
             style={[styles.navButton, isActive("/polling/pollCreator") && styles.activeNavButton]} 
             onPress={() => router.replace("/polling/pollCreator")}
->>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c:PollingApp/components/NavBar.tsx
             accessibilityLabel="Create Poll"
           >
             <Ionicons 
               name="create" 
               size={24} 
-<<<<<<< HEAD:PollingApp/app/components/NavBar.tsx
-              color={isActive("/creation/pollCreator") ? "#007bff" : "#ffffff"} 
-            />
-            <Text style={[styles.navText, isActive("/creation/pollCreator") && styles.activeNavText]}>
-=======
               color={isActive("/polling/pollCreator") ? "#007bff" : "#ffffff"} 
             />
             <Text style={[styles.navText, isActive("/polling/pollCreator") && styles.activeNavText]}>
->>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c:PollingApp/components/NavBar.tsx
               Create
             </Text>
           </TouchableOpacity>

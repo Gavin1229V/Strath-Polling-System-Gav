@@ -12,16 +12,9 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from '@react-native-picker/picker';
-<<<<<<<< HEAD:PollingApp/app/creation/pollCreator.tsx
 import { fetchPolls, getSocket, Poll } from "../components/global";
 import { SERVER_IP } from "../config";
 import { useFirstName, useLastName, useAuth, useUserClasses, useUserRole } from "../components/userDetails";
-========
-import { fetchPolls, getSocket } from "../global";
-import { SERVER_IP } from "../config";
-import { useFirstName, useLastName, useAuth, useUserClasses, useUserRole } from "../userDetails";
-import { Poll } from "../global";
->>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c:PollingApp/app/polling/pollCreator.tsx
 import styles from "../../styles/styles"; // Use global styles
 import { Ionicons } from '@expo/vector-icons';
 

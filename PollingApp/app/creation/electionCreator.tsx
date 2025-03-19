@@ -12,11 +12,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-<<<<<<<< HEAD:PollingApp/app/creation/electionCreator.tsx
+
 import { useAuth } from "../components/userDetails";
-========
-import { useAuth } from "../userDetails";
->>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c:PollingApp/app/election/createElection.tsx
 import { SERVER_IP } from "../config";
 import styles from "../../styles/styles";
 
@@ -148,11 +145,7 @@ const CreateElectionScreen = () => {
       Alert.alert(
         "Success",
         "Election created successfully",
-<<<<<<<< HEAD:PollingApp/app/creation/electionCreator.tsx
-        [{ text: "OK", onPress: () => router.push("../election/elections") }]
-========
         [{ text: "OK", onPress: () => router.push("/election/elections") }]
->>>>>>>> 91e3ab4ccfdbe377b93895ad23221f34484e5d2c:PollingApp/app/election/createElection.tsx
       );
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to create election. Please try again.");
